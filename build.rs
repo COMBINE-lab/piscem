@@ -5,7 +5,7 @@ fn main() {
     let custom_cc = env::var("CC");
     let custom_cxx = env::var("CXX");
 
-    let mut cfg = Box::new(Config::new("mindex"));
+    let mut cfg = Box::new(Config::new("piscem-cpp"));
     match custom_cc {
         Ok(cc_var) => {
             (*cfg).define("CMAKE_C_COMPILER", cc_var);

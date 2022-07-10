@@ -1,3 +1,3 @@
 [submodule "mindex"]
-	path = mindex
+	path = piscem-cpp
 	url = https://github.com/COMBINE-lab/mindex.git
