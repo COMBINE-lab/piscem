@@ -1,6 +1,7 @@
 use std::ffi::CString;
 use std::os::raw::{c_char, c_int};
 
+use clap::{arg, command, Command}; 
 use anyhow::{bail, Result};
 
 #[link(name = "pesc_static", kind = "static")]
@@ -15,7 +16,49 @@ fn print_help() {
     eprintln!("try build -h or map -h.");
 }
 
+
+/*
+Options:
+  -h,--help                   Print this help message and exit
+  -i,--index TEXT REQUIRED    input index prefix
+  -1,--read1 TEXT ... REQUIRED
+                              path to list of read 1 files
+  -2,--read2 TEXT ... REQUIRED
+                              path to list of read 2 files
+  -o,--output TEXT REQUIRED   path to output directory
+  -g,--geometry TEXT REQUIRED geometry of barcode, umi and read
+  -t,--threads UINT [16]      An integer that specifies the number of threads to use
+ */
+
 fn main() -> Result<(), anyhow::Error> {
+
+    let matches = command!()
+        .propagate_version(true)
+        .subcommand_required(true)
+        .arg_required_else_help(true)
+        .subcommand(
+            Command::new("build")
+            .about("build the piscem index")
+            .args(&[
+                  arg!(-r --ref <REF> "reference FASTA location"),
+                  arg!(-k --klen <K> "length of k-mer to use"),
+                  arg!(-t --threads <THREADS> "number of threads to use"),
+                  arg!(-o --output <OUTPUT> "output file stem")
+            ])
+        )
+        .subcommand(
+            Command::new("map")
+            .about("map reads")
+            .args(&[
+                  arg!(-i --index <INDEX> "input index prefix"),
+                  arg!(-'1' --read1 <READ1> "path to list of read 1 files").require_value_delimiter(true), 
+                  arg!(-'2' --read2 <READ2> "path to list of read 2 files").require_value_delimiter(true), 
+                  arg!(-o --output <OUTPUT> "path to output directory"),
+                  arg!(-g --geometry <GEO> "geometry of barcode, umi and read"),
+                  arg!(-t --threads <THREADS> "an interger specifying the number of threads to use")
+            ])
+        ).get_matches();
+
     if std::env::args().len() < 2 {
         print_help();
         bail!("program exited abnormally.");
