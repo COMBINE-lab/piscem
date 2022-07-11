@@ -27,6 +27,8 @@ fn main() {
         dst.join("lib").display()
     );
     println!("cargo:rustc-link-lib=static=pesc_static");
+    println!("cargo:rustc-link-lib=static=build_static");
+    println!("cargo:rustc-link-lib=static=sshash_static");
+    println!("cargo:rustc-link-lib=static=z");
     println!("cargo:rustc-link-lib=dylib=stdc++");
-    println!("cargo:rustc-link-lib=dylib=z");
 }
