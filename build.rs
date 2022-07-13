@@ -18,6 +18,9 @@ fn main() {
         (*cfg_piscem_cpp).define("CMAKE_CXX_COMPILER", cxx_var.clone());
         (*cfg_cf).define("CMAKE_CXX_COMPILER", cxx_var);
     }
+    
+    (*cfg_piscem_cpp).always_configure(false);
+    (*cfg_cf).always_configure(false);
 
     let dst_piscem_cpp = (*cfg_piscem_cpp).build();
     let dst_cf = (*cfg_cf).build();
@@ -37,5 +40,10 @@ fn main() {
     println!("cargo:rustc-link-lib=static=sshash_static");
     println!("cargo:rustc-link-lib=static=z");
     println!("cargo:rustc-link-lib=static=bz2");
+
+    #[cfg(target_os="linux")]
     println!("cargo:rustc-link-lib=dylib=stdc++");
+
+    #[cfg(target_os="macos")]
+    println!("cargo:rustc-link-lib=dylib=c++");
 }

@@ -9,7 +9,6 @@ extern "C" {
     pub fn run_pesc(args: c_int, argsv: *const *const c_char) -> c_int;
 }
 
-
 #[link(name = "build_static", kind = "static")]
 extern "C" {
     pub fn run_build(args: c_int, argsv: *const *const c_char) -> c_int;
@@ -36,6 +35,7 @@ fn main() -> Result<(), anyhow::Error> {
                     arg!(-t --threads <THREADS> "number of threads to use")
                         .value_parser(value_parser!(usize)),
                     arg!(-o --output <OUTPUT> "output file stem"),
+                    arg!(-q --quiet "be quiet during the indexing phase (no effect yet for cDBG building).")
                 ]),
         )
         .subcommand(
@@ -49,6 +49,7 @@ fn main() -> Result<(), anyhow::Error> {
                 arg!(-g --geometry <GEO> "geometry of barcode, umi and read"),
                 arg!(-t --threads <THREADS> "an interger specifying the number of threads to use")
                     .value_parser(value_parser!(u32)),
+                arg!(-q --quiet "be quiet during mapping.")
             ]),
         )
         .get_matches();
@@ -69,12 +70,13 @@ fn main() -> Result<(), anyhow::Error> {
                 .get_one::<String>("output")
                 .expect("OUTPUT missing")
                 .to_string();
+            let quiet = sub_matches.contains_id("quiet");
 
             assert!(m < k, "minimizer length ({}) >= k-mer len ({})", m, k);
 
             let cf_out = o.clone() + "_cfish";
             let mut build_ret;
-            
+
             args.push(CString::new("cdbg_builder").unwrap());
             args.push(CString::new("--seq").unwrap());
             args.push(CString::new(r.as_str()).unwrap());
@@ -109,6 +111,10 @@ fn main() -> Result<(), anyhow::Error> {
             args.push(CString::new("--canonical-parsing").unwrap());
             args.push(CString::new("-o").unwrap());
             args.push(CString::new(o.as_str()).unwrap());
+            if quiet {
+                args.push(CString::new("--quiet").unwrap());
+            }
+
             {
                 println!("{:?}", args);
                 let arg_ptrs: Vec<*const c_char> = args.iter().map(|s| s.as_ptr()).collect();
@@ -149,6 +155,7 @@ fn main() -> Result<(), anyhow::Error> {
                 .get_one::<String>("output")
                 .expect("OUTPUT missing")
                 .to_string();
+            let quiet = sub_matches.contains_id("quiet");
 
             args.push(CString::new("ref_mapper").unwrap());
             args.push(CString::new("-i").unwrap());
@@ -167,6 +174,9 @@ fn main() -> Result<(), anyhow::Error> {
 
             args.push(CString::new("-o").unwrap());
             args.push(CString::new(o.as_str()).unwrap());
+            if quiet {
+                args.push(CString::new("--quiet").unwrap());
+            }
 
             let arg_ptrs: Vec<*const c_char> = args.iter().map(|s| s.as_ptr()).collect();
             let args_len: c_int = args.len() as c_int;
