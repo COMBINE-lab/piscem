@@ -20,25 +20,6 @@ extern "C" {
     pub fn cf_build(args: c_int, argsv: *const *const c_char) -> c_int;
 }
 
-fn print_help() {
-    eprintln!("piscem version 0.0.1: ");
-    eprintln!("valid commands are {{build, map}}, for more information ");
-    eprintln!("try build -h or map -h.");
-}
-
-/*
-Options:
-  -h,--help                   Print this help message and exit
-  -i,--index TEXT REQUIRED    input index prefix
-  -1,--read1 TEXT ... REQUIRED
-                              path to list of read 1 files
-  -2,--read2 TEXT ... REQUIRED
-                              path to list of read 2 files
-  -o,--output TEXT REQUIRED   path to output directory
-  -g,--geometry TEXT REQUIRED geometry of barcode, umi and read
-  -t,--threads UINT [16]      An integer that specifies the number of threads to use
- */
-
 fn main() -> Result<(), anyhow::Error> {
     let matches = command!()
         .propagate_version(true)
@@ -92,7 +73,7 @@ fn main() -> Result<(), anyhow::Error> {
             assert!(m < k, "minimizer length ({}) >= k-mer len ({})", m, k);
 
             let cf_out = o.clone() + "_cfish";
-            let mut build_ret = 0;
+            let mut build_ret;
             
             args.push(CString::new("cdbg_builder").unwrap());
             args.push(CString::new("--seq").unwrap());
@@ -173,7 +154,7 @@ fn main() -> Result<(), anyhow::Error> {
             args.push(CString::new("-i").unwrap());
             args.push(CString::new(i.as_str()).unwrap());
             args.push(CString::new("-g").unwrap());
-            args.push(CString::new(g.to_string()).unwrap());
+            args.push(CString::new(g).unwrap());
 
             args.push(CString::new("-1").unwrap());
             args.push(CString::new(r1.as_str()).unwrap());

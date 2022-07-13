@@ -9,20 +9,14 @@ fn main() {
     let mut cfg_cf = Box::new(Config::new("cuttlefish"));
 
     (*cfg_cf).define("INSTANCE_COUNT", "32");
-    match custom_cc {
-        Ok(cc_var) => {
-            (*cfg_piscem_cpp).define("CMAKE_C_COMPILER", cc_var.clone());
-            (*cfg_cf).define("CMAKE_C_COMPILER", cc_var);
-        }
-        Err(_) => {}
+    if let Ok(cc_var) = custom_cc {
+        (*cfg_piscem_cpp).define("CMAKE_C_COMPILER", cc_var.clone());
+        (*cfg_cf).define("CMAKE_C_COMPILER", cc_var);
     }
 
-    match custom_cxx {
-        Ok(cxx_var) => {
-            (*cfg_piscem_cpp).define("CMAKE_CXX_COMPILER", cxx_var.clone());
-            (*cfg_cf).define("CMAKE_CXX_COMPILER", cxx_var);
-        }
-        Err(_) => {}
+    if let Ok(cxx_var) = custom_cxx {
+        (*cfg_piscem_cpp).define("CMAKE_CXX_COMPILER", cxx_var.clone());
+        (*cfg_cf).define("CMAKE_CXX_COMPILER", cxx_var);
     }
 
     let dst_piscem_cpp = (*cfg_piscem_cpp).build();
@@ -36,7 +30,6 @@ fn main() {
         "cargo:rustc-link-search=native={}",
         dst_piscem_cpp.join("lib").display()
     );
-    
 
     println!("cargo:rustc-link-lib=static=kmc_core");
     println!("cargo:rustc-link-lib=static=pesc_static");
