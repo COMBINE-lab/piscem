@@ -93,7 +93,7 @@ fn main() -> Result<(), anyhow::Error> {
 
             let cf_out = o.clone() + "_cfish";
             let mut build_ret = 0;
-            /*
+            
             args.push(CString::new("cdbg_builder").unwrap());
             args.push(CString::new("--seq").unwrap());
             args.push(CString::new(r.as_str()).unwrap());
@@ -121,7 +121,6 @@ fn main() -> Result<(), anyhow::Error> {
             }
 
             args.clear();
-            */
             args.push(CString::new("ref_index_builder").unwrap());
             args.push(CString::new(cf_out.as_str()).unwrap());
             args.push(CString::new(k.to_string()).unwrap());
