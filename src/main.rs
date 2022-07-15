@@ -2,7 +2,7 @@ use std::ffi::CString;
 use std::os::raw::{c_char, c_int};
 
 use anyhow::{bail, Result};
-use clap::{arg, command, value_parser, Command};
+use clap::{Parser, Subcommand};
 
 #[link(name = "pesc_static", kind = "static")]
 extern "C" {
@@ -19,74 +19,110 @@ extern "C" {
     pub fn cf_build(args: c_int, argsv: *const *const c_char) -> c_int;
 }
 
+/// Indexing and mapping to compacted colored de Bruijn graphs
+#[derive(Debug, Parser)]
+struct Cli {
+    #[clap(subcommand)]
+    command: Commands,
+}
+
+#[derive(Debug, Subcommand)]
+enum Commands {
+    /// Index a reference sequence
+    #[clap(arg_required_else_help = true)]
+    Build {
+        /// reference FASTA location
+        #[clap(short, long, value_parser)]
+        reference: String,
+
+        /// length of k-mer to use
+        #[clap(short, long, value_parser)]
+        klen: usize,
+
+        /// length of minimizer to use
+        #[clap(short, long, value_parser)]
+        mlen: usize,
+
+        /// number of threads to use
+        #[clap(short, long, value_parser)]
+        threads: usize,
+
+        /// output file stem
+        #[clap(short, long, value_parser)]
+        output: String,
+
+        /// be quiet during the indexing phase (no effect yet for cDBG building).
+        #[clap(short, action)]
+        quiet: bool,
+    },
+
+    /// map reads
+    #[clap(arg_required_else_help = true)]
+    Map {
+        /// input index prefix
+        #[clap(short, long, value_parser)]
+        index: String,
+
+        /// geometry of barcode, umi and read
+        #[clap(short, long, value_parser)]
+        geometry: String,
+
+        /// path to list of read 1 files
+        #[clap(short = '1', long, value_parser)]
+        read1: Vec<String>,
+
+        /// path to list of read 1 files
+        #[clap(short = '2', long, value_parser)]
+        read2: Vec<String>,
+
+        /// number of threads to use
+        #[clap(short, long, value_parser)]
+        threads: usize,
+
+        /// path to output directory
+        #[clap(short, long, value_parser)]
+        output: String,
+
+        /// be quiet during mapping
+        #[clap(short, action)]
+        quiet: bool,
+    },
+}
+
 fn main() -> Result<(), anyhow::Error> {
-    let matches = command!()
-        .propagate_version(true)
-        .subcommand_required(true)
-        .arg_required_else_help(true)
-        .subcommand(
-            Command::new("build")
-                .about("build the piscem index")
-                .args(&[
-                    arg!(-r --reference <REFERENCE> "reference FASTA location"),
-                    arg!(-k --klen <K> "length of k-mer to use").value_parser(value_parser!(usize)),
-                    arg!(-m --mlen <M> "length of the minimizer use")
-                        .value_parser(value_parser!(usize)),
-                    arg!(-t --threads <THREADS> "number of threads to use")
-                        .value_parser(value_parser!(usize)),
-                    arg!(-o --output <OUTPUT> "output file stem"),
-                    arg!(-q --quiet "be quiet during the indexing phase (no effect yet for cDBG building).")
-                ]),
-        )
-        .subcommand(
-            Command::new("map").about("map reads").args(&[
-                arg!(-i --index <INDEX> "input index prefix"),
-                arg!(-'1' --read1 <READ1> "path to list of read 1 files")
-                    .require_value_delimiter(true),
-                arg!(-'2' --read2 <READ2> "path to list of read 2 files")
-                    .require_value_delimiter(true),
-                arg!(-o --output <OUTPUT> "path to output directory"),
-                arg!(-g --geometry <GEO> "geometry of barcode, umi and read"),
-                arg!(-t --threads <THREADS> "an interger specifying the number of threads to use")
-                    .value_parser(value_parser!(u32)),
-                arg!(-q --quiet "be quiet during mapping.")
-            ]),
-        )
-        .get_matches();
+    let cli_args = Cli::parse();
 
-    match matches.subcommand() {
-        Some(("build", sub_matches)) => {
+    match cli_args.command {
+        Commands::Build {
+            reference,
+            klen,
+            mlen,
+            threads,
+            output,
+            quiet,
+        } => {
+            assert!(
+                mlen < klen,
+                "minimizer length ({}) >= k-mer len ({})",
+                mlen,
+                klen
+            );
+
             let mut args: Vec<CString> = vec![];
-            let k: usize = *sub_matches.get_one("klen").expect("K should be an integer");
-            let m: usize = *sub_matches.get_one("mlen").expect("M should be an integer");
-            let r: String = sub_matches
-                .get_one::<String>("reference")
-                .expect("REFERENCE missing")
-                .to_string();
-            let t: usize = *sub_matches
-                .get_one("threads")
-                .expect("THREADS should be an integer");
-            let o: String = sub_matches
-                .get_one::<String>("output")
-                .expect("OUTPUT missing")
-                .to_string();
-            let quiet = sub_matches.contains_id("quiet");
 
-            assert!(m < k, "minimizer length ({}) >= k-mer len ({})", m, k);
-
-            let cf_out = o.clone() + "_cfish";
+            let cf_out = output.clone() + "_cfish";
             let mut build_ret;
 
             args.push(CString::new("cdbg_builder").unwrap());
             args.push(CString::new("--seq").unwrap());
-            args.push(CString::new(r.as_str()).unwrap());
+            args.push(CString::new(reference.as_str()).unwrap());
             args.push(CString::new("-k").unwrap());
-            args.push(CString::new(k.to_string()).unwrap());
+            args.push(CString::new(klen.to_string()).unwrap());
             args.push(CString::new("-o").unwrap());
             args.push(CString::new(cf_out.as_str()).unwrap());
             args.push(CString::new("-t").unwrap());
-            args.push(CString::new(t.to_string()).unwrap());
-            // format
+            args.push(CString::new(threads.to_string()).unwrap());
+            // output format
             args.push(CString::new("-f").unwrap());
             args.push(CString::new("3").unwrap());
 
@@ -106,11 +142,11 @@ fn main() -> Result<(), anyhow::Error> {
             args.clear();
             args.push(CString::new("ref_index_builder").unwrap());
             args.push(CString::new(cf_out.as_str()).unwrap());
-            args.push(CString::new(k.to_string()).unwrap());
-            args.push(CString::new(m.to_string()).unwrap()); // minimizer length
+            args.push(CString::new(klen.to_string()).unwrap());
+            args.push(CString::new(mlen.to_string()).unwrap()); // minimizer length
             args.push(CString::new("--canonical-parsing").unwrap());
             args.push(CString::new("-o").unwrap());
-            args.push(CString::new(o.as_str()).unwrap());
+            args.push(CString::new(output.as_str()).unwrap());
             if quiet {
                 args.push(CString::new("--quiet").unwrap());
             }
@@ -126,54 +162,37 @@ fn main() -> Result<(), anyhow::Error> {
                 bail!("indexer returned exit code {}; failure.", build_ret);
             }
         }
-        Some(("map", sub_matches)) => {
+
+        Commands::Map {
+            index,
+            geometry,
+            read1,
+            read2,
+            threads,
+            output,
+            quiet,
+        } => {
             let mut args: Vec<CString> = vec![];
-            let r1: String = sub_matches
-                .get_many("read1")
-                .expect("read2 empty")
-                .cloned()
-                .collect::<Vec<String>>()
-                .join(",");
-            let r2: String = sub_matches
-                .get_many("read2")
-                .expect("read1 empty")
-                .cloned()
-                .collect::<Vec<String>>()
-                .join(",");
-            let i: String = sub_matches
-                .get_one::<String>("index")
-                .expect("INDEX missing")
-                .to_string();
-            let t: u32 = *sub_matches
-                .get_one("threads")
-                .expect("THREADS should be an integer");
-            let g: String = sub_matches
-                .get_one::<String>("geometry")
-                .expect("OUTPUT missing")
-                .to_string();
-            let o: String = sub_matches
-                .get_one::<String>("output")
-                .expect("OUTPUT missing")
-                .to_string();
-            let quiet = sub_matches.contains_id("quiet");
 
             args.push(CString::new("ref_mapper").unwrap());
             args.push(CString::new("-i").unwrap());
-            args.push(CString::new(i.as_str()).unwrap());
+            args.push(CString::new(index).unwrap());
             args.push(CString::new("-g").unwrap());
-            args.push(CString::new(g).unwrap());
+            args.push(CString::new(geometry).unwrap());
 
             args.push(CString::new("-1").unwrap());
-            args.push(CString::new(r1.as_str()).unwrap());
+            let r1_string = read1.join(",");
+            args.push(CString::new(r1_string.as_str()).unwrap());
 
             args.push(CString::new("-2").unwrap());
-            args.push(CString::new(r2.as_str()).unwrap());
+            let r2_string = read2.join(",");
+            args.push(CString::new(r2_string.as_str()).unwrap());
 
             args.push(CString::new("-t").unwrap());
-            args.push(CString::new(t.to_string()).unwrap());
+            args.push(CString::new(threads.to_string()).unwrap());
 
             args.push(CString::new("-o").unwrap());
-            args.push(CString::new(o.as_str()).unwrap());
+            args.push(CString::new(output.as_str()).unwrap());
             if quiet {
                 args.push(CString::new("--quiet").unwrap());
             }
@@ -183,13 +202,6 @@ fn main() -> Result<(), anyhow::Error> {
 
             unsafe { run_pesc(args_len, arg_ptrs.as_ptr()) };
         }
-        Some((cmd, &_)) => {
-            bail!("Invalid command {}; program exited abnormally.", cmd);
-        }
-        None => {
-            bail!("missing command; program exited abnormally.");
-        }
     }
-
     Ok(())
 }

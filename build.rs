@@ -5,6 +5,10 @@ fn main() {
     let custom_cc = env::var("CC");
     let custom_cxx = env::var("CXX");
 
+
+    println!("cargo:rerun-if-changed=./cuttlefish");
+    println!("cargo:rerun-if-changed=./piscem-cpp");
+
     let mut cfg_piscem_cpp = Box::new(Config::new("piscem-cpp"));
     let mut cfg_cf = Box::new(Config::new("cuttlefish"));
 
@@ -18,7 +22,7 @@ fn main() {
         (*cfg_piscem_cpp).define("CMAKE_CXX_COMPILER", cxx_var.clone());
         (*cfg_cf).define("CMAKE_CXX_COMPILER", cxx_var);
     }
-    
+
     (*cfg_piscem_cpp).always_configure(false);
     (*cfg_cf).always_configure(false);
 
@@ -41,9 +45,9 @@ fn main() {
     println!("cargo:rustc-link-lib=static=z");
     println!("cargo:rustc-link-lib=static=bz2");
 
-    #[cfg(target_os="linux")]
+    #[cfg(target_os = "linux")]
     println!("cargo:rustc-link-lib=dylib=stdc++");
 
-    #[cfg(target_os="macos")]
+    #[cfg(target_os = "macos")]
     println!("cargo:rustc-link-lib=dylib=c++");
 }
