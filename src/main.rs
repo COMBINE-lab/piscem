@@ -6,7 +6,8 @@ use clap::{Parser, Subcommand};
 
 #[link(name = "pesc_static", kind = "static")]
 extern "C" {
-    pub fn run_pesc(args: c_int, argsv: *const *const c_char) -> c_int;
+    pub fn run_pesc_sc(args: c_int, argsv: *const *const c_char) -> c_int;
+    pub fn run_pesc_bulk(args: c_int, argsv: *const *const c_char) -> c_int;
 }
 
 #[link(name = "build_static", kind = "static")]
@@ -56,9 +57,9 @@ enum Commands {
         quiet: bool,
     },
 
-    /// map reads
+    /// map sc reads
     #[clap(arg_required_else_help = true)]
-    Map {
+    MapSC {
         /// input index prefix
         #[clap(short, long, value_parser)]
         index: String,
@@ -66,6 +67,34 @@ enum Commands {
         /// geometry of barcode, umi and read
         #[clap(short, long, value_parser)]
         geometry: String,
+
+        /// path to list of read 1 files
+        #[clap(short = '1', long, value_parser)]
+        read1: Vec<String>,
+
+        /// path to list of read 1 files
+        #[clap(short = '2', long, value_parser)]
+        read2: Vec<String>,
+
+        /// number of threads to use
+        #[clap(short, long, value_parser)]
+        threads: usize,
+
+        /// path to output directory
+        #[clap(short, long, value_parser)]
+        output: String,
+
+        /// be quiet during mapping
+        #[clap(short, action)]
+        quiet: bool,
+    },
+
+    /// map bulk reads
+    #[clap(arg_required_else_help = true)]
+    MapBulk {
+        /// input index prefix
+        #[clap(short, long, value_parser)]
+        index: String,
 
         /// path to list of read 1 files
         #[clap(short = '1', long, value_parser)]
@@ -161,9 +190,9 @@ fn main() -> Result<(), anyhow::Error> {
             if build_ret != 0 {
                 bail!("indexer returned exit code {}; failure.", build_ret);
             }
-        }
+        },
 
-        Commands::Map {
+        Commands::MapSC {
             index,
             geometry,
             read1,
@@ -174,7 +203,7 @@ fn main() -> Result<(), anyhow::Error> {
         } => {
             let mut args: Vec<CString> = vec![];
 
-            args.push(CString::new("ref_mapper").unwrap());
+            args.push(CString::new("sc_ref_mapper").unwrap());
             args.push(CString::new("-i").unwrap());
             args.push(CString::new(index).unwrap());
             args.push(CString::new("-g").unwrap());
@@ -200,7 +229,50 @@ fn main() -> Result<(), anyhow::Error> {
             let arg_ptrs: Vec<*const c_char> = args.iter().map(|s| s.as_ptr()).collect();
             let args_len: c_int = args.len() as c_int;
 
-            unsafe { run_pesc(args_len, arg_ptrs.as_ptr()) };
+            let map_ret = unsafe { run_pesc_sc(args_len, arg_ptrs.as_ptr()) };
+            if map_ret != 0 {
+                bail!("mapper returned exit code {}; failure", map_ret);
+            }
+        },
+
+        Commands::MapBulk {
+            index,
+            read1,
+            read2,
+            threads,
+            output,
+            quiet,
+        } => {
+            let mut args: Vec<CString> = vec![];
+
+            args.push(CString::new("bulk_ref_mapper").unwrap());
+            args.push(CString::new("-i").unwrap());
+            args.push(CString::new(index).unwrap());
+
+            args.push(CString::new("-1").unwrap());
+            let r1_string = read1.join(",");
+            args.push(CString::new(r1_string.as_str()).unwrap());
+
+            args.push(CString::new("-2").unwrap());
+            let r2_string = read2.join(",");
+            args.push(CString::new(r2_string.as_str()).unwrap());
+
+            args.push(CString::new("-t").unwrap());
+            args.push(CString::new(threads.to_string()).unwrap());
+
+            args.push(CString::new("-o").unwrap());
+            args.push(CString::new(output.as_str()).unwrap());
+            if quiet {
+                args.push(CString::new("--quiet").unwrap());
+            }
+
+            let arg_ptrs: Vec<*const c_char> = args.iter().map(|s| s.as_ptr()).collect();
+            let args_len: c_int = args.len() as c_int;
+
+            let map_ret = unsafe { run_pesc_bulk(args_len, arg_ptrs.as_ptr()) };
+            if map_ret != 0 {
+                bail!("mapper returned exit code {}; failure", map_ret);
+            }
         }
     }
     Ok(())

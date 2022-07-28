@@ -6,8 +6,8 @@ fn main() {
     let custom_cxx = env::var("CXX");
 
 
-    println!("cargo:rerun-if-changed=./cuttlefish");
-    println!("cargo:rerun-if-changed=./piscem-cpp");
+    println!("cargo:rerun-if-changed=cuttlefish/CMakeLists.txt");
+    println!("cargo:rerun-if-changed=piscem-cpp/CMakeLists.txt");
 
     let mut cfg_piscem_cpp = Box::new(Config::new("piscem-cpp"));
     let mut cfg_cf = Box::new(Config::new("cuttlefish"));
