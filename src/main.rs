@@ -147,6 +147,7 @@ fn main() -> Result<(), anyhow::Error> {
             args.push(CString::new(reference.as_str()).unwrap());
             args.push(CString::new("-k").unwrap());
             args.push(CString::new(klen.to_string()).unwrap());
+            args.push(CString::new("--track-short-seqs").unwrap());
             args.push(CString::new("-o").unwrap());
             args.push(CString::new(cf_out.as_str()).unwrap());
             args.push(CString::new("-t").unwrap());
@@ -190,7 +191,7 @@ fn main() -> Result<(), anyhow::Error> {
             if build_ret != 0 {
                 bail!("indexer returned exit code {}; failure.", build_ret);
             }
-        },
+        }
 
         Commands::MapSC {
             index,
@@ -233,7 +234,7 @@ fn main() -> Result<(), anyhow::Error> {
             if map_ret != 0 {
                 bail!("mapper returned exit code {}; failure", map_ret);
             }
-        },
+        }
 
         Commands::MapBulk {
             index,
