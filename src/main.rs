@@ -33,8 +33,8 @@ enum Commands {
     #[clap(arg_required_else_help = true)]
     Build {
         /// reference FASTA location
-        #[clap(short, long, value_parser)]
-        reference: String,
+        #[clap(short, long, value_parser, value_delimiter = ',', required = true)]
+        references: Vec<String>,
 
         /// length of k-mer to use
         #[clap(short, long, value_parser)]
@@ -123,7 +123,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     match cli_args.command {
         Commands::Build {
-            reference,
+            references,
             klen,
             mlen,
             threads,
@@ -143,8 +143,13 @@ fn main() -> Result<(), anyhow::Error> {
             let mut build_ret;
 
             args.push(CString::new("cdbg_builder").unwrap());
-            args.push(CString::new("--seq").unwrap());
-            args.push(CString::new(reference.as_str()).unwrap());
+
+            if !references.is_empty() {
+                args.push(CString::new("--seq").unwrap());
+                let reflist = references.join(",");
+                args.push(CString::new(reflist.as_str()).unwrap());
+            }
+
             args.push(CString::new("-k").unwrap());
             args.push(CString::new(klen.to_string()).unwrap());
             args.push(CString::new("--track-short-seqs").unwrap());
