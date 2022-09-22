@@ -69,11 +69,23 @@ enum Commands {
         geometry: String,
 
         /// path to list of read 1 files
-        #[clap(short = '1', long, value_parser)]
+        #[clap(
+            short = '1',
+            long,
+            value_parser,
+            value_delimiter = ',',
+            required = true
+        )]
         read1: Vec<String>,
 
         /// path to list of read 1 files
-        #[clap(short = '2', long, value_parser)]
+        #[clap(
+            short = '2',
+            long,
+            value_parser,
+            value_delimiter = ',',
+            required = true
+        )]
         read2: Vec<String>,
 
         /// number of threads to use
@@ -97,11 +109,23 @@ enum Commands {
         index: String,
 
         /// path to list of read 1 files
-        #[clap(short = '1', long, value_parser)]
+        #[clap(
+            short = '1',
+            long,
+            value_parser,
+            value_delimiter = ',',
+            required = true
+        )]
         read1: Vec<String>,
 
         /// path to list of read 1 files
-        #[clap(short = '2', long, value_parser)]
+        #[clap(
+            short = '2',
+            long,
+            value_parser,
+            value_delimiter = ',',
+            required = true
+        )]
         read2: Vec<String>,
 
         /// number of threads to use
