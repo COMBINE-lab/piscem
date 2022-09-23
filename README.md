@@ -78,7 +78,29 @@ OPTIONS:
 
 Here, you can provide multiple files to `-1` and `-2` as a `,` separated list just like the `-r` argument to the `build` command. Of course, it is important to ensure that you provide that information in the same order to the `-1` and `-2` flags.  The `--geometry` flag specifies the geometry of the UMIs and cell barcodes for the reads; you can find a description [here](https://github.com/COMBINE-lab/piscem/blob/main/README.md#geometry).
 
+map-bulk
+--------
 
+The `map-bulk` command maps bulk sequencing reads against a piscem index. The tool performs _non-spliced_ alignment, and therefore is applicable to e.g. metagenomic reads against a set of metagenomes, DNA-seq alignment against one or more references, or RNA-seq alignment against a transcriptome (but not a genome). The program and produces a bulk RAD format output file that can be processed by [`piscem-infer`]([https://github.com/COMBINE-lab/alevin-fry](https://github.com/COMBINE-lab/piscem-infer) to estimate the abundances of all references in the index given the mapped reads.  The usage is as so:
+
+```
+piscem-map-bulk
+map bulk reads
+
+USAGE:
+    piscem map-bulk [OPTIONS] --index <INDEX> --read1 <READ1> --read2 <READ2> --threads <THREADS> --output <OUTPUT>
+
+OPTIONS:
+    -1, --read1 <READ1>        path to list of read 1 files
+    -2, --read2 <READ2>        path to list of read 1 files
+    -h, --help                 Print help information
+    -i, --index <INDEX>        input index prefix
+    -o, --output <OUTPUT>      path to output directory
+    -q                         be quiet during mapping
+    -t, --threads <THREADS>    number of threads to use
+```
+
+Here, you can provide multiple files to `-1` and `-2` as a `,` separated list just like the `-r` argument to the `build` command. Of course, it is important to ensure that you provide that information in the same order to the `-1` and `-2` flags.
 
 geometry
 --------
