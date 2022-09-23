@@ -76,7 +76,7 @@ OPTIONS:
     -t, --threads <THREADS>      number of threads to use
 ```
 
-Here, you can provide multiple files to `-1` and `-2` as a `,` separated list just like the `-r` argument to the `build` command. Of course, it is important to ensure that you provide that information in the same order to the `-1` and `-2` flags.  The `--geometry` flag specifies the geometry of the UMIs and cell barcodes for the reads; you can find a description [here](https://github.com/COMBINE-lab/piscem/edit/main/README.md#geometry).
+Here, you can provide multiple files to `-1` and `-2` as a `,` separated list just like the `-r` argument to the `build` command. Of course, it is important to ensure that you provide that information in the same order to the `-1` and `-2` flags.  The `--geometry` flag specifies the geometry of the UMIs and cell barcodes for the reads; you can find a description [here](https://github.com/COMBINE-lab/piscem/main/README.md#geometry).
 
 
 
