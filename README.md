@@ -83,7 +83,7 @@ Here, you can provide multiple files to `-1` and `-2` as a `,` separated list ju
 geometry
 --------
 
-The geometry parameter `--geometry|-g` can take either a specific geometry name, or a generic specifier string.  The current valid names are `chromium_v2` and `chromium_v3` for 10x Genomics Chromium v2 and v3 protocols respectively.  The custom format is as follows: you must specify the content of read 1 and read 2 in terms of the barcode, UMI, and mappable read sequence.  A specification looks like this:
+The geometry parameter `--geometry|-g` can take either a specific geometry name, or a generic specifier string.  The current valid names are `chromium_v2` and `chromium_v3` for 10x Genomics Chromium v2 and v3 protocols respectively. The custom format is as follows: you must specify the content of read 1 and read 2 in terms of the barcode, UMI, and mappable read sequence. A specification looks like this:
 
 ```
 1{b[16]u[12]x:}2{r:}
