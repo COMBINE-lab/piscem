@@ -1,8 +1,11 @@
 use std::ffi::CString;
 use std::os::raw::{c_char, c_int};
+use std::path::PathBuf;
 
 use anyhow::{bail, Result};
-use clap::{Parser, Subcommand};
+use clap::{ArgGroup, Parser, Subcommand};
+use env_logger::Env;
+use log::info;
 
 #[link(name = "pesc_static", kind = "static")]
 extern "C" {
@@ -31,11 +34,39 @@ struct Cli {
 enum Commands {
     /// Index a reference sequence
     #[clap(arg_required_else_help = true)]
+    #[clap(group(
+            ArgGroup::new("ref-input")
+            .required(true)
+            .args(&["ref-seqs", "ref-lists", "ref-dirs"]),
+            ))]
     Build {
         /// reference FASTA location
-        #[clap(short, long, value_parser, value_delimiter = ',', required = true)]
-        references: Vec<String>,
+        #[clap(
+            short = 's',
+            long,
+            value_parser,
+            value_delimiter = ',',
+            required = true
+        )]
+        ref_seqs: Option<Vec<String>>,
 
+        #[clap(
+            short = 'l',
+            long,
+            value_parser,
+            value_delimiter = ',',
+            required = true
+        )]
+        ref_lists: Option<Vec<String>>,
+
+        #[clap(
+            short = 'd',
+            long,
+            value_parser,
+            value_delimiter = ',',
+            required = true
+        )]
+        ref_dirs: Option<Vec<String>>,
         /// length of k-mer to use
         #[clap(short, long, value_parser)]
         klen: usize,
@@ -50,7 +81,7 @@ enum Commands {
 
         /// output file stem
         #[clap(short, long, value_parser)]
-        output: String,
+        output: PathBuf,
 
         /// be quiet during the indexing phase (no effect yet for cDBG building).
         #[clap(short, action)]
@@ -144,16 +175,20 @@ enum Commands {
 
 fn main() -> Result<(), anyhow::Error> {
     let cli_args = Cli::parse();
+    env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
 
     match cli_args.command {
         Commands::Build {
-            references,
+            ref_seqs,
+            ref_lists,
+            ref_dirs,
             klen,
             mlen,
             threads,
             output,
             quiet,
         } => {
+            info!("starting piscem build");
             assert!(
                 mlen < klen,
                 "minimizer length ({}) >= k-mer len ({})",
@@ -163,22 +198,68 @@ fn main() -> Result<(), anyhow::Error> {
 
             let mut args: Vec<CString> = vec![];
 
-            let cf_out = output.clone() + "_cfish";
+            let cf_out = PathBuf::from(output.as_path().to_string_lossy().into_owned() + "_cfish");
             let mut build_ret;
 
             args.push(CString::new("cdbg_builder").unwrap());
 
-            if !references.is_empty() {
-                args.push(CString::new("--seq").unwrap());
-                let reflist = references.join(",");
-                args.push(CString::new(reflist.as_str()).unwrap());
+            // We can treat the different input options independently
+            // here because the argument parser should have enforced
+            // their exclusivity.
+            let mut has_input = false;
+
+            if let Some(seqs) = ref_seqs {
+                if !seqs.is_empty() {
+                    args.push(CString::new("--seq").unwrap());
+                    let reflist = seqs.join(",");
+                    args.push(CString::new(reflist.as_str()).unwrap());
+                    has_input = true;
+                }
             }
+
+            if let Some(lists) = ref_lists {
+                if !lists.is_empty() {
+                    args.push(CString::new("--list").unwrap());
+                    let reflist = lists.join(",");
+                    args.push(CString::new(reflist.as_str()).unwrap());
+                    has_input = true;
+                }
+            }
+
+            if let Some(dirs) = ref_dirs {
+                if !dirs.is_empty() {
+                    args.push(CString::new("--dir").unwrap());
+                    let reflist = dirs.join(",");
+                    args.push(CString::new(reflist.as_str()).unwrap());
+                    has_input = true;
+                }
+            }
+
+            assert!(
+                has_input,
+                "Input (via --ref-seqs, --ref-lists, or --ref-dirs) must be provided."
+            );
 
             args.push(CString::new("-k").unwrap());
             args.push(CString::new(klen.to_string()).unwrap());
             args.push(CString::new("--track-short-seqs").unwrap());
+
+            // check if the provided output path is more than just a prefix
+            // if so, check if the specified directory exists and create it
+            // if it doesn't.
+            if let Some(parent_path) = cf_out.parent() {
+                if !parent_path.exists() {
+                    std::fs::create_dir_all(parent_path)?;
+                    info!(
+                        "directory {} did not already exist; creating it.",
+                        parent_path.display()
+                    );
+                }
+            }
+
             args.push(CString::new("-o").unwrap());
-            args.push(CString::new(cf_out.as_str()).unwrap());
+            args.push(CString::new(cf_out.as_path().to_string_lossy().into_owned()).unwrap());
+
             args.push(CString::new("-t").unwrap());
             args.push(CString::new(threads.to_string()).unwrap());
             // output format
@@ -200,12 +281,12 @@ fn main() -> Result<(), anyhow::Error> {
 
             args.clear();
             args.push(CString::new("ref_index_builder").unwrap());
-            args.push(CString::new(cf_out.as_str()).unwrap());
+            args.push(CString::new(cf_out.as_path().to_string_lossy().into_owned()).unwrap());
             args.push(CString::new(klen.to_string()).unwrap());
             args.push(CString::new(mlen.to_string()).unwrap()); // minimizer length
             args.push(CString::new("--canonical-parsing").unwrap());
             args.push(CString::new("-o").unwrap());
-            args.push(CString::new(output.as_str()).unwrap());
+            args.push(CString::new(output.as_path().to_string_lossy().into_owned()).unwrap());
             if quiet {
                 args.push(CString::new("--quiet").unwrap());
             }
@@ -220,6 +301,8 @@ fn main() -> Result<(), anyhow::Error> {
             if build_ret != 0 {
                 bail!("indexer returned exit code {}; failure.", build_ret);
             }
+
+            info!("piscem build finished");
         }
 
         Commands::MapSC {
@@ -231,27 +314,24 @@ fn main() -> Result<(), anyhow::Error> {
             output,
             quiet,
         } => {
-            let mut args: Vec<CString> = vec![];
-
-            args.push(CString::new("sc_ref_mapper").unwrap());
-            args.push(CString::new("-i").unwrap());
-            args.push(CString::new(index).unwrap());
-            args.push(CString::new("-g").unwrap());
-            args.push(CString::new(geometry).unwrap());
-
-            args.push(CString::new("-1").unwrap());
             let r1_string = read1.join(",");
-            args.push(CString::new(r1_string.as_str()).unwrap());
-
-            args.push(CString::new("-2").unwrap());
             let r2_string = read2.join(",");
-            args.push(CString::new(r2_string.as_str()).unwrap());
+            let mut args: Vec<CString> = vec![
+                CString::new("sc_ref_mapper").unwrap(),
+                CString::new("-i").unwrap(),
+                CString::new(index).unwrap(),
+                CString::new("-g").unwrap(),
+                CString::new(geometry).unwrap(),
+                CString::new("-1").unwrap(),
+                CString::new(r1_string.as_str()).unwrap(),
+                CString::new("-2").unwrap(),
+                CString::new(r2_string.as_str()).unwrap(),
+                CString::new("-t").unwrap(),
+                CString::new(threads.to_string()).unwrap(),
+                CString::new("-o").unwrap(),
+                CString::new(output.as_str()).unwrap(),
+            ];
 
-            args.push(CString::new("-t").unwrap());
-            args.push(CString::new(threads.to_string()).unwrap());
-
-            args.push(CString::new("-o").unwrap());
-            args.push(CString::new(output.as_str()).unwrap());
             if quiet {
                 args.push(CString::new("--quiet").unwrap());
             }
@@ -273,25 +353,23 @@ fn main() -> Result<(), anyhow::Error> {
             output,
             quiet,
         } => {
-            let mut args: Vec<CString> = vec![];
-
-            args.push(CString::new("bulk_ref_mapper").unwrap());
-            args.push(CString::new("-i").unwrap());
-            args.push(CString::new(index).unwrap());
-
-            args.push(CString::new("-1").unwrap());
             let r1_string = read1.join(",");
-            args.push(CString::new(r1_string.as_str()).unwrap());
-
-            args.push(CString::new("-2").unwrap());
             let r2_string = read2.join(",");
-            args.push(CString::new(r2_string.as_str()).unwrap());
 
-            args.push(CString::new("-t").unwrap());
-            args.push(CString::new(threads.to_string()).unwrap());
+            let mut args: Vec<CString> = vec![
+                CString::new("bulk_ref_mapper").unwrap(),
+                CString::new("-i").unwrap(),
+                CString::new(index).unwrap(),
+                CString::new("-1").unwrap(),
+                CString::new(r1_string.as_str()).unwrap(),
+                CString::new("-2").unwrap(),
+                CString::new(r2_string.as_str()).unwrap(),
+                CString::new("-t").unwrap(),
+                CString::new(threads.to_string()).unwrap(),
+                CString::new("-o").unwrap(),
+                CString::new(output.as_str()).unwrap(),
+            ];
 
-            args.push(CString::new("-o").unwrap());
-            args.push(CString::new(output.as_str()).unwrap());
             if quiet {
                 args.push(CString::new("--quiet").unwrap());
             }

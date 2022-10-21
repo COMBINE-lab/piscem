@@ -5,7 +5,6 @@ fn main() {
     let custom_cc = env::var("CC");
     let custom_cxx = env::var("CXX");
 
-
     println!("cargo:rerun-if-changed=cuttlefish/CMakeLists.txt");
     println!("cargo:rerun-if-changed=piscem-cpp/CMakeLists.txt");
 
