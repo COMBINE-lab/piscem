@@ -25,6 +25,7 @@ extern "C" {
 
 /// Indexing and mapping to compacted colored de Bruijn graphs
 #[derive(Debug, Parser)]
+#[clap(version)]
 struct Cli {
     #[clap(subcommand)]
     command: Commands,
