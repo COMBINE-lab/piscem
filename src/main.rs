@@ -41,7 +41,7 @@ enum Commands {
             .args(&["ref-seqs", "ref-lists", "ref-dirs"]),
             ))]
     Build {
-        /// reference FASTA location
+        /// ',' separated list of reference FASTA files
         #[clap(
             short = 's',
             long,
@@ -51,6 +51,7 @@ enum Commands {
         )]
         ref_seqs: Option<Vec<String>>,
 
+        /// ',' separated list of files (each listing input FASTA files)
         #[clap(
             short = 'l',
             long,
@@ -60,6 +61,8 @@ enum Commands {
         )]
         ref_lists: Option<Vec<String>>,
 
+        /// ',' separated list of directories (all FASTA files in each directory will be indexed,
+        /// but not recursively).
         #[clap(
             short = 'd',
             long,
@@ -68,6 +71,7 @@ enum Commands {
             required = true
         )]
         ref_dirs: Option<Vec<String>>,
+
         /// length of k-mer to use
         #[clap(short, long, value_parser)]
         klen: usize,
@@ -89,7 +93,7 @@ enum Commands {
         quiet: bool,
     },
 
-    /// map sc reads
+    /// map reads for single-cell processing
     #[clap(arg_required_else_help = true)]
     MapSC {
         /// input index prefix
@@ -133,7 +137,7 @@ enum Commands {
         quiet: bool,
     },
 
-    /// map bulk reads
+    /// map reads for bulk processing
     #[clap(arg_required_else_help = true)]
     MapBulk {
         /// input index prefix
