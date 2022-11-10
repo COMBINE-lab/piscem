@@ -115,7 +115,7 @@ Here, you can provide multiple files to `-1` and `-2` as a `,` separated list ju
 map-bulk
 --------
 
-The `map-bulk` command maps bulk sequencing reads against a piscem index. The tool performs _non-spliced_ alignment, and therefore is applicable to e.g. metagenomic reads against a set of metagenomes, DNA-seq alignment against one or more references, or RNA-seq alignment against a transcriptome (but not a genome). The program and produces a bulk RAD format output file that can be processed by [`piscem-infer`]([https://github.com/COMBINE-lab/alevin-fry](https://github.com/COMBINE-lab/piscem-infer) to estimate the abundances of all references in the index given the mapped reads.  The usage is as so:
+The `map-bulk` command maps bulk sequencing reads against a piscem index. The tool performs _non-spliced_ alignment, and therefore is applicable to e.g. metagenomic reads against a set of metagenomes, DNA-seq alignment against one or more references, or RNA-seq alignment against a transcriptome (but not a genome). The program and produces a bulk RAD format output file that can be processed by [`piscem-infer`](https://github.com/COMBINE-lab/alevin-fry](https://github.com/COMBINE-lab/piscem-infer) to estimate the abundances of all references in the index given the mapped reads.  The usage is as so:
 
 ```
 piscem-map-bulk
