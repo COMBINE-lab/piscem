@@ -2,29 +2,61 @@
 
 `piscem` is a rust wrapper for a next-generation index + mapper tool (still currently written in C++17).
 
+Building
+========
+
 This repository currently pulls in (as submodules) `piscem-cpp` and `cuttlefish`, and then uses cargo + the cmake crate to build the C++ code.  It then calls out to the main C++ function from `main.rs`.  The idea is that in this framework, code can slowly be migrated from C++ -> Rust in a piecemeal fashion, while the overall top-level repo remains a "rust build".  Importantly, `piscem` unifies and simplifies the other tools, making them runnable via a single executable and providing an improved command line interface.
+
+To build `piscem`, first check out this repository **with recursive dependencies**:
+
+```
+git clone --recursive https://github.com/COMBINE-lab/piscem.git
+```
+
+if you have accidentally checked out the repo without the `--recursive` flag, you can change into the top-level directory and run:
+
+```
+git submodule update --init --recursive
+```
+
+Once you have checked out the repository, you can build `piscem` with 
+
+```
+cargo build --release
+```
+
+It is worth noting that the build process respects the `CC` and `CXX` environment flags, so if you wish to use a specific C++ compiler, you can run:
+
+```
+CC=<path_to_c_compiler> CXX=<path_to_cxx_compiler> cargo build --release
+```
+
 
 Usage
 =====
 
 ```
-piscem
+piscem 0.1.0
 Indexing and mapping to compacted colored de Bruijn graphs
 
 USAGE:
     piscem <SUBCOMMAND>
 
 OPTIONS:
-    -h, --help    Print help information
+    -h, --help       Print help information
+    -V, --version    Print version information
 
 SUBCOMMANDS:
     build       Index a reference sequence
     help        Print this message or the help of the given subcommand(s)
-    map-bulk    map bulk reads
-    map-sc      map sc reads
+    map-bulk    map reads for bulk processing
+    map-sc      map reads for single-cell processing
 ```
 
 `piscem` has several sub-commands; `build`, `map-sc` and `map-bulk` described below.
+
+Info for different sub-commands
+
 
 build
 -----
@@ -36,16 +68,18 @@ piscem-build
 Index a reference sequence
 
 USAGE:
-    piscem build [OPTIONS] --references <REFERENCES> --klen <KLEN> --mlen <MLEN> --threads <THREADS> --output <OUTPUT>
+    piscem build [OPTIONS] --klen <KLEN> --mlen <MLEN> --threads <THREADS> --output <OUTPUT> <--ref-seqs <REF_SEQS>|--ref-lists <REF_LISTS>|--ref-dirs <REF_DIRS>>
 
 OPTIONS:
-    -h, --help                       Print help information
-    -k, --klen <KLEN>                length of k-mer to use
-    -m, --mlen <MLEN>                length of minimizer to use
-    -o, --output <OUTPUT>            output file stem
-    -q                               be quiet during the indexing phase (no effect yet for cDBG building)
-    -r, --references <REFERENCES>    reference FASTA location
-    -t, --threads <THREADS>          number of threads to use
+    -d, --ref-dirs <REF_DIRS>      ',' separated list of directories (all FASTA files in each directory will be indexed, but not recursively)
+    -h, --help                     Print help information
+    -k, --klen <KLEN>              length of k-mer to use
+    -l, --ref-lists <REF_LISTS>    ',' separated list of files (each listing input FASTA files)
+    -m, --mlen <MLEN>              length of minimizer to use
+    -o, --output <OUTPUT>          output file stem
+    -q                             be quiet during the indexing phase (no effect yet for cDBG building)
+    -s, --ref-seqs <REF_SEQS>      ',' separated list of reference FASTA files
+    -t, --threads <THREADS>        number of threads to use
 ```
 
 The parameters should be reasonably self-expalanatory.  The `-k` parameter is the k-mer size for the underlying colored compacted de Bruijn graph, and the `-m` parameter is the minimizer size used to build the [`sshash`](https://github.com/jermp/sshash) data structure.  The quiet `-q` flag applies to the `sshash` indexing step (not yet the CdBG construction step) and will prevent extra output being written to `stderr`.
