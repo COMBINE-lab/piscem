@@ -25,155 +25,114 @@ extern "C" {
 
 /// Indexing and mapping to compacted colored de Bruijn graphs
 #[derive(Debug, Parser)]
-#[clap(version)]
+#[command(author, version, about)]
+#[command(propagate_version = true)]
 struct Cli {
-    #[clap(subcommand)]
+    #[command(subcommand)]
     command: Commands,
 }
 
 #[derive(Debug, Subcommand)]
 enum Commands {
     /// Index a reference sequence
-    #[clap(arg_required_else_help = true)]
-    #[clap(group(
+    #[command(arg_required_else_help = true)]
+    #[command(group(
             ArgGroup::new("ref-input")
             .required(true)
-            .args(&["ref-seqs", "ref-lists", "ref-dirs"]),
+            .args(&["ref_seqs", "ref_lists", "ref_dirs"]),
             ))]
     Build {
         /// ',' separated list of reference FASTA files
-        #[clap(
-            short = 's',
-            long,
-            value_parser,
-            value_delimiter = ',',
-            required = true
-        )]
+        #[arg(short = 's', long, value_delimiter = ',', required = true)]
         ref_seqs: Option<Vec<String>>,
 
         /// ',' separated list of files (each listing input FASTA files)
-        #[clap(
-            short = 'l',
-            long,
-            value_parser,
-            value_delimiter = ',',
-            required = true
-        )]
+        #[arg(short = 'l', long, value_delimiter = ',', required = true)]
         ref_lists: Option<Vec<String>>,
 
         /// ',' separated list of directories (all FASTA files in each directory will be indexed,
         /// but not recursively).
-        #[clap(
-            short = 'd',
-            long,
-            value_parser,
-            value_delimiter = ',',
-            required = true
-        )]
+        #[arg(short = 'd', long, value_delimiter = ',', required = true)]
         ref_dirs: Option<Vec<String>>,
 
         /// length of k-mer to use
-        #[clap(short, long, value_parser)]
+        #[arg(short, long)]
         klen: usize,
 
         /// length of minimizer to use
-        #[clap(short, long, value_parser)]
+        #[arg(short, long)]
         mlen: usize,
 
         /// number of threads to use
-        #[clap(short, long, value_parser)]
+        #[arg(short, long)]
         threads: usize,
 
         /// output file stem
-        #[clap(short, long, value_parser)]
+        #[arg(short, long)]
         output: PathBuf,
 
         /// be quiet during the indexing phase (no effect yet for cDBG building).
-        #[clap(short, action)]
+        #[arg(short)]
         quiet: bool,
     },
 
     /// map reads for single-cell processing
-    #[clap(arg_required_else_help = true)]
+    #[command(arg_required_else_help = true)]
     MapSC {
         /// input index prefix
-        #[clap(short, long, value_parser)]
+        #[arg(short, long)]
         index: String,
 
         /// geometry of barcode, umi and read
-        #[clap(short, long, value_parser)]
+        #[arg(short, long)]
         geometry: String,
 
         /// path to list of read 1 files
-        #[clap(
-            short = '1',
-            long,
-            value_parser,
-            value_delimiter = ',',
-            required = true
-        )]
+        #[arg(short = '1', long, value_delimiter = ',', required = true)]
         read1: Vec<String>,
 
         /// path to list of read 1 files
-        #[clap(
-            short = '2',
-            long,
-            value_parser,
-            value_delimiter = ',',
-            required = true
-        )]
+        #[arg(short = '2', long, value_delimiter = ',', required = true)]
         read2: Vec<String>,
 
         /// number of threads to use
-        #[clap(short, long, value_parser)]
+        #[arg(short, long)]
         threads: usize,
 
         /// path to output directory
-        #[clap(short, long, value_parser)]
+        #[arg(short, long)]
         output: String,
 
         /// be quiet during mapping
-        #[clap(short, action)]
+        #[arg(short)]
         quiet: bool,
     },
 
     /// map reads for bulk processing
-    #[clap(arg_required_else_help = true)]
+    #[command(arg_required_else_help = true)]
     MapBulk {
         /// input index prefix
-        #[clap(short, long, value_parser)]
+        #[arg(short, long)]
         index: String,
 
         /// path to list of read 1 files
-        #[clap(
-            short = '1',
-            long,
-            value_parser,
-            value_delimiter = ',',
-            required = true
-        )]
+        #[arg(short = '1', long, value_delimiter = ',', required = true)]
         read1: Vec<String>,
 
         /// path to list of read 1 files
-        #[clap(
-            short = '2',
-            long,
-            value_parser,
-            value_delimiter = ',',
-            required = true
-        )]
+        #[arg(short = '2', long, value_delimiter = ',', required = true)]
         read2: Vec<String>,
 
         /// number of threads to use
-        #[clap(short, long, value_parser)]
+        #[arg(short, long)]
         threads: usize,
 
         /// path to output directory
-        #[clap(short, long, value_parser)]
+        #[arg(short, long)]
         output: String,
 
         /// be quiet during mapping
-        #[clap(short, action)]
+        #[arg(short)]
         quiet: bool,
     },
 }
@@ -271,6 +230,7 @@ fn main() -> Result<(), anyhow::Error> {
             args.push(CString::new("-f").unwrap());
             args.push(CString::new("3").unwrap());
 
+            info!("args = {:?}", args);
             {
                 let arg_ptrs: Vec<*const c_char> = args.iter().map(|s| s.as_ptr()).collect();
                 let args_len: c_int = args.len() as c_int;

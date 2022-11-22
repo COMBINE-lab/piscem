@@ -1,6 +1,6 @@
 [package]
 name = "piscem"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 build = "build.rs"
 
@@ -11,8 +11,8 @@ cmake = "0.1"
 
 [dependencies]
 anyhow = "1.0"
-clap = { version = "3.2.22", features = ["cargo", "derive", "env", "wrap_help"] }
-env_logger = "0.9.1"
+clap = { version = "4.0.26", features = ["cargo", "derive", "env", "wrap_help"] }
+env_logger = "0.9.3"
 log = "0.4.17"
 
 [profile.release]
