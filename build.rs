@@ -54,4 +54,12 @@ fn main() {
 
     #[cfg(target_os = "macos")]
     println!("cargo:rustc-link-lib=dylib=c++");
+
+    if let Ok(is_conda_build) = conda_build {
+        // if we are on OSX, building on conda
+        // the filesystem support is borked and
+        // we have to jump through some hoops.
+        #[cfg(target_os = "macos")]
+        println!("cargo:rustc-link-lib=dyliub=c++experimental");
+    }
 }
