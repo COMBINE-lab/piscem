@@ -62,6 +62,6 @@ fn main() {
         // the filesystem support is borked and
         // we have to jump through some hoops.
         #[cfg(target_os = "macos")]
-        println!("cargo:rustc-link-lib=dyliub=c++experimental");
+        println!("cargo:rustc-link-lib=dylib=c++experimental");
     }
 }
