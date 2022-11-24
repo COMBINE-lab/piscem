@@ -4,6 +4,7 @@ use std::env;
 fn main() {
     let custom_cc = env::var("CC");
     let custom_cxx = env::var("CXX");
+    let conda_build = env::var("CONDA_BUILD");
 
     println!("cargo:rerun-if-changed=cuttlefish/CMakeLists.txt");
     println!("cargo:rerun-if-changed=piscem-cpp/CMakeLists.txt");
@@ -20,6 +21,10 @@ fn main() {
     if let Ok(cxx_var) = custom_cxx {
         (*cfg_piscem_cpp).define("CMAKE_CXX_COMPILER", cxx_var.clone());
         (*cfg_cf).define("CMAKE_CXX_COMPILER", cxx_var);
+    }
+
+    if let Ok(is_conda_build) = conda_build {
+        (*cfg_cf).define("CONDA_BUILD", "TRUE");
     }
 
     (*cfg_piscem_cpp).always_configure(false);
