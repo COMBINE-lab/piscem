@@ -61,7 +61,7 @@ fn main() {
         // if we are on OSX, building on conda
         // the filesystem support is borked and
         // we have to jump through some hoops.
-        #[cfg(target_os = "macos")]
-        println!("cargo:rustc-link-lib=static=c++fs");
+        // #[cfg(target_os = "macos")]
+        // println!("cargo:rustc-link-lib=static=c++fs");
     }
 }
