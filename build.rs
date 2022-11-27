@@ -26,6 +26,7 @@ fn main() {
 
     if let Ok(_conda_build) = conda_build {
         (*cfg_cf).define("CONDA_BUILD", "TRUE");
+        (*cfg_cf).define("CMAKE_OSX_DEPLOYMENT_TARGET", "10.15");
         is_conda_build = true;
     }
 
