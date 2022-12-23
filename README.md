@@ -31,6 +31,8 @@ It is worth noting that the build process respects the `CC` and `CXX` environmen
 CC=<path_to_c_compiler> CXX=<path_to_cxx_compiler> cargo build --release
 ```
 
+Compling this code requires a C++17 capable compiler, so if your default compiler does not have these capabilities, please be sure to pass the appropriate 
+flags along to `cargo build` with a sufficiently capable compiler.
 
 Usage
 =====
