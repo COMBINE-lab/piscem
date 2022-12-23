@@ -80,6 +80,11 @@ enum Commands {
         #[arg(long)]
         overwrite: bool,
 
+        /// skip the construction of the equivalence class lookup table 
+        /// when building the index.
+        #[arg(long)]
+        no_ec_table: bool,
+
         /// be quiet during the indexing phase (no effect yet for cDBG building).
         #[arg(short)]
         quiet: bool,
@@ -111,6 +116,17 @@ enum Commands {
         /// path to output directory
         #[arg(short, long)]
         output: String,
+
+        /// enable extra checking of the equivalence classes of k-mers that were too 
+        /// ambiguous to be included in chaining (may improve specificity, but could slow down
+        /// mapping slightly).
+        #[arg(long)]
+        check_ambig_hits: bool,
+
+        /// determines the maximum cardinality equivalence class 
+        /// (number of (txp, orientation status) pairs) to examine if performing check-ambig-hits.
+        #[arg(long, short, requires="check_ambig_hits", default_value_t=256)]
+        max_ec_card: u32,
 
         /// be quiet during mapping
         #[arg(short)]
@@ -161,6 +177,7 @@ fn main() -> Result<(), anyhow::Error> {
             output,
             keep_intermediate_dbg,
             overwrite,
+            no_ec_table,
             quiet,
         } => {
             info!("starting piscem build");
@@ -280,6 +297,9 @@ fn main() -> Result<(), anyhow::Error> {
             args.push(CString::new(klen.to_string()).unwrap());
             args.push(CString::new(mlen.to_string()).unwrap()); // minimizer length
             args.push(CString::new("--canonical-parsing").unwrap());
+            if !no_ec_table {
+                args.push(CString::new("--build-ec-table").unwrap());
+            }
             args.push(CString::new("-o").unwrap());
             args.push(CString::new(output.as_path().to_string_lossy().into_owned()).unwrap());
             if quiet {
@@ -332,6 +352,8 @@ fn main() -> Result<(), anyhow::Error> {
             read2,
             threads,
             output,
+            check_ambig_hits,
+            max_ec_card,
             quiet,
         } => {
             let r1_string = read1.join(",");
@@ -351,6 +373,12 @@ fn main() -> Result<(), anyhow::Error> {
                 CString::new("-o").unwrap(),
                 CString::new(output.as_str()).unwrap(),
             ];
+
+            if check_ambig_hits {
+                args.push(CString::new("--check-ambig-hits").unwrap());
+                args.push(CString::new("--max-ec-card").unwrap());
+                args.push(CString::new(max_ec_card.to_string()).unwrap());
+            }
 
             if quiet {
                 args.push(CString::new("--quiet").unwrap());
