@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use anyhow::{bail, Result};
 use clap::{ArgGroup, Parser, Subcommand};
 use env_logger::Env;
-use log::info;
+use log::{info, warn};
 
 #[link(name = "pesc_static", kind = "static")]
 extern "C" {
@@ -70,6 +70,15 @@ enum Commands {
         /// output file stem
         #[arg(short, long)]
         output: PathBuf,
+
+        /// retain the reduced format GFA files produced by cuttlefish that 
+        /// describe the reference cDBG (the default is to remove these).
+        #[arg(long)]
+        keep_intermediate_dbg: bool,
+
+        /// overwite an existing index if the output path is the same.
+        #[arg(long)]
+        overwrite: bool,
 
         /// be quiet during the indexing phase (no effect yet for cDBG building).
         #[arg(short)]
@@ -150,6 +159,8 @@ fn main() -> Result<(), anyhow::Error> {
             mlen,
             threads,
             output,
+            keep_intermediate_dbg,
+            overwrite,
             quiet,
         } => {
             info!("starting piscem build");
@@ -163,6 +174,25 @@ fn main() -> Result<(), anyhow::Error> {
             let mut args: Vec<CString> = vec![];
 
             let cf_out = PathBuf::from(output.as_path().to_string_lossy().into_owned() + "_cfish");
+            let cf_base_path = cf_out.as_path();
+            let seg_file = cf_base_path.with_extension("cf_seg");
+            let seq_file = cf_base_path.with_extension("cf_seq");
+            let struct_file = cf_base_path.with_extension("json");
+
+            if overwrite {
+                if struct_file.exists() { std::fs::remove_file(struct_file.clone())?; }
+                if seg_file.exists() { std::fs::remove_file(seg_file.clone())?; }
+                if seq_file.exists() { std::fs::remove_file(seq_file.clone())?; }
+            }
+
+            if struct_file.exists() {
+                if !seq_file.exists() || !seg_file.exists() {
+                    warn!("The prefix you have chosen for output already corresponds to an existing cDBG structure file {:?}.", struct_file.display());
+                    warn!("However, the corresponding seq and seg files do not exist. Please either delete this structure file, choose another output prefix, or use the --overwrite flag.");
+                    bail!("Cannot write over existing index without the --overwrite flag.");
+                }
+            }
+
             let mut build_ret;
 
             args.push(CString::new("cdbg_builder").unwrap());
@@ -265,6 +295,31 @@ fn main() -> Result<(), anyhow::Error> {
 
             if build_ret != 0 {
                 bail!("indexer returned exit code {}; failure.", build_ret);
+            }
+
+            if !keep_intermediate_dbg {
+                info!("removing intermediate cdBG files produced by cuttlefish.");
+
+                 match std::fs::remove_file(seg_file.clone()) {
+                    Ok(_) => {
+                      info!("removed segment file {}", seg_file.display());
+                    },
+                    Err(e) => {
+                      warn!("cannot remove {}, encountered error {:?}!", seg_file.display(), e);
+                    }
+                };
+
+                match std::fs::remove_file(seq_file.clone()) {
+                    Ok(_) => {
+                      info!("removed tiling file {}", seq_file.display());
+                    },
+                    Err(e) => {
+                      warn!("cannot remove {}, encountered error {:?}!", seq_file.display(), e);
+                    }
+                };
+                // for now, let the json file stick around. It's 
+                // generally very small and may contain useful information 
+                // about the references being indexed.
             }
 
             info!("piscem build finished");
