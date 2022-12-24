@@ -5,8 +5,7 @@ use std::str::FromStr;
 
 use anyhow::{bail, Result};
 use clap::{ArgGroup, Parser, Subcommand};
-use env_logger::Env;
-use log::{info, warn};
+use tracing::{warn, info, Level};
 
 #[link(name = "pesc_static", kind = "static")]
 extern "C" {
@@ -29,6 +28,9 @@ extern "C" {
 #[command(author, version, about)]
 #[command(propagate_version = true)]
 struct Cli {
+    /// be quiet (no effect yet for cDBG building phase of indexing).
+    #[arg(short, long)]
+    quiet: bool,
     #[command(subcommand)]
     command: Commands,
 }
@@ -85,10 +87,6 @@ enum Commands {
         /// when building the index.
         #[arg(long)]
         no_ec_table: bool,
-
-        /// be quiet during the indexing phase (no effect yet for cDBG building).
-        #[arg(short)]
-        quiet: bool,
     },
 
     /// map reads for single-cell processing
@@ -128,10 +126,6 @@ enum Commands {
         /// (number of (txp, orientation status) pairs) to examine if performing check-ambig-hits.
         #[arg(long, short, requires="check_ambig_hits", default_value_t=256)]
         max_ec_card: u32,
-
-        /// be quiet during mapping
-        #[arg(short)]
-        quiet: bool,
     },
 
     /// map reads for bulk processing
@@ -156,16 +150,19 @@ enum Commands {
         /// path to output directory
         #[arg(short, long)]
         output: String,
-
-        /// be quiet during mapping
-        #[arg(short)]
-        quiet: bool,
     },
 }
 
 fn main() -> Result<(), anyhow::Error> {
     let cli_args = Cli::parse();
-    env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
+    //env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
+    
+    let quiet = cli_args.quiet;
+    if quiet {
+        tracing_subscriber::fmt().with_max_level(Level::WARN).init();
+    } else {
+        tracing_subscriber::fmt().with_max_level(Level::INFO).init();
+    }
 
     match cli_args.command {
         Commands::Build {
@@ -179,7 +176,6 @@ fn main() -> Result<(), anyhow::Error> {
             keep_intermediate_dbg,
             overwrite,
             no_ec_table,
-            quiet,
         } => {
             info!("starting piscem build");
             assert!(
@@ -355,7 +351,6 @@ fn main() -> Result<(), anyhow::Error> {
             output,
             check_ambig_hits,
             max_ec_card,
-            quiet,
         } => {
             let r1_string = read1.join(",");
             let r2_string = read2.join(",");
@@ -415,7 +410,6 @@ fn main() -> Result<(), anyhow::Error> {
             read2,
             threads,
             output,
-            quiet,
         } => {
             let r1_string = read1.join(",");
             let r2_string = read2.join(",");
