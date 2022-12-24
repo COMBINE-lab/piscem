@@ -1,6 +1,7 @@
 use std::ffi::CString;
 use std::os::raw::{c_char, c_int};
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use anyhow::{bail, Result};
 use clap::{ArgGroup, Parser, Subcommand};
@@ -358,10 +359,15 @@ fn main() -> Result<(), anyhow::Error> {
         } => {
             let r1_string = read1.join(",");
             let r2_string = read2.join(",");
+
+            let mut idx_suffixes: Vec<String> = vec![
+                "sshash".into(), "ctab".into(), "refinfo".into()
+            ];
+
             let mut args: Vec<CString> = vec![
                 CString::new("sc_ref_mapper").unwrap(),
                 CString::new("-i").unwrap(),
-                CString::new(index).unwrap(),
+                CString::new(index.clone()).unwrap(),
                 CString::new("-g").unwrap(),
                 CString::new(geometry).unwrap(),
                 CString::new("-1").unwrap(),
@@ -378,12 +384,22 @@ fn main() -> Result<(), anyhow::Error> {
                 args.push(CString::new("--check-ambig-hits").unwrap());
                 args.push(CString::new("--max-ec-card").unwrap());
                 args.push(CString::new(max_ec_card.to_string()).unwrap());
+                idx_suffixes.push(".ectab".into());
+            }
+
+            let idx_path = PathBuf::from_str(&index)?;
+            for s in idx_suffixes {
+                let req_file = idx_path.with_extension(s);
+                if !req_file.exists() {
+                    bail!("To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!", &index, req_file.display());
+                }
             }
 
             if quiet {
                 args.push(CString::new("--quiet").unwrap());
             }
 
+            info!("cmd: {:?}", args);
             let arg_ptrs: Vec<*const c_char> = args.iter().map(|s| s.as_ptr()).collect();
             let args_len: c_int = args.len() as c_int;
 
