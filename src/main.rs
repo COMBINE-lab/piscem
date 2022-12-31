@@ -379,7 +379,7 @@ fn main() -> Result<(), anyhow::Error> {
                 args.push(CString::new("--check-ambig-hits").unwrap());
                 args.push(CString::new("--max-ec-card").unwrap());
                 args.push(CString::new(max_ec_card.to_string()).unwrap());
-                idx_suffixes.push(".ectab".into());
+                idx_suffixes.push("ectab".into());
             }
 
             let idx_path = PathBuf::from_str(&index)?;
