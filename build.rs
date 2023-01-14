@@ -5,6 +5,7 @@ fn main() {
     let custom_cc = env::var("CC");
     let custom_cxx = env::var("CXX");
     let conda_build = env::var("CONDA_BUILD");
+    let nopie_build = env::var("NOPIE");
     let mut is_conda_build = false;
 
     println!("cargo:rerun-if-changed=cuttlefish/CMakeLists.txt");
@@ -35,6 +36,15 @@ fn main() {
 
     let dst_piscem_cpp = (*cfg_piscem_cpp).build();
     let dst_cf = (*cfg_cf).build();
+
+    if let Ok(nopie) = nopie_build {
+        match nopie.as_str() {
+            "1" | "TRUE" | "true" | "True" => {
+                println!("cargo:rustc-link-arg=-no-pie");
+            },
+            _ => {}
+        }
+    }
 
     println!(
         "cargo:rustc-link-search=native={}",
