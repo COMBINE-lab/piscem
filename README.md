@@ -34,6 +34,23 @@ CC=<path_to_c_compiler> CXX=<path_to_cxx_compiler> cargo build --release
 Compling this code requires a C++17 capable compiler, so if your default compiler does not have these capabilities, please be sure to pass the appropriate 
 flags along to `cargo build` with a sufficiently capable compiler.
 
+Other details about building
+----------------------------
+
+The build process requries access to static libraries for both `zlib` and `libbz2`. If these are not in your standard path, you can provide them via the `RUSTFLAGS` option as:
+
+```
+RUSTFLAGS='-L <path_to_directory_with_libraries>' cargo build --release
+```
+
+Finally, on some systems, you may get a strange linking error related to relocatable symbols. In that case, you can pass the `NOPIE` option to the build process as follows:
+
+```
+NOPIE=TRUE cargo build --release
+```
+
+Note that the `CC`, `CXX`, `RUSTFLAGS` and `NOPIE` environment variables are all "stackable" and you can provide any subset of them that you need during build.
+
 Usage
 =====
 
