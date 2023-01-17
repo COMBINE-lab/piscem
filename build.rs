@@ -41,7 +41,7 @@ fn main() {
         match nopie.as_str() {
             "1" | "TRUE" | "true" | "True" => {
                 println!("cargo:rustc-link-arg=-no-pie");
-            },
+            }
             _ => {}
         }
     }

@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use anyhow::{bail, Result};
 use clap::{ArgGroup, Parser, Subcommand};
-use tracing::{warn, info, Level};
+use tracing::{error, info, warn, Level};
 
 #[link(name = "pesc_static", kind = "static")]
 extern "C" {
@@ -74,16 +74,20 @@ enum Commands {
         #[arg(short, long)]
         output: PathBuf,
 
-        /// retain the reduced format GFA files produced by cuttlefish that 
+        /// retain the reduced format GFA files produced by cuttlefish that
         /// describe the reference cDBG (the default is to remove these).
         #[arg(long)]
         keep_intermediate_dbg: bool,
+
+        /// working directory where temporary files should be placed.
+        #[arg(short = 'w', long, default_value_os_t = PathBuf::from("."))]
+        work_dir: PathBuf,
 
         /// overwite an existing index if the output path is the same.
         #[arg(long)]
         overwrite: bool,
 
-        /// skip the construction of the equivalence class lookup table 
+        /// skip the construction of the equivalence class lookup table
         /// when building the index.
         #[arg(long)]
         no_ec_table: bool,
@@ -116,15 +120,15 @@ enum Commands {
         #[arg(short, long)]
         output: String,
 
-        /// enable extra checking of the equivalence classes of k-mers that were too 
+        /// enable extra checking of the equivalence classes of k-mers that were too
         /// ambiguous to be included in chaining (may improve specificity, but could slow down
         /// mapping slightly).
         #[arg(long)]
         check_ambig_hits: bool,
 
-        /// determines the maximum cardinality equivalence class 
+        /// determines the maximum cardinality equivalence class
         /// (number of (txp, orientation status) pairs) to examine if performing check-ambig-hits.
-        #[arg(long, short, requires="check_ambig_hits", default_value_t=256)]
+        #[arg(long, short, requires = "check_ambig_hits", default_value_t = 256)]
         max_ec_card: u32,
     },
 
@@ -156,7 +160,7 @@ enum Commands {
 fn main() -> Result<(), anyhow::Error> {
     let cli_args = Cli::parse();
     //env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
-    
+
     let quiet = cli_args.quiet;
     if quiet {
         tracing_subscriber::fmt().with_max_level(Level::WARN).init();
@@ -174,6 +178,7 @@ fn main() -> Result<(), anyhow::Error> {
             threads,
             output,
             keep_intermediate_dbg,
+            work_dir,
             overwrite,
             no_ec_table,
         } => {
@@ -194,9 +199,15 @@ fn main() -> Result<(), anyhow::Error> {
             let struct_file = cf_base_path.with_extension("json");
 
             if overwrite {
-                if struct_file.exists() { std::fs::remove_file(struct_file.clone())?; }
-                if seg_file.exists() { std::fs::remove_file(seg_file.clone())?; }
-                if seq_file.exists() { std::fs::remove_file(seq_file.clone())?; }
+                if struct_file.exists() {
+                    std::fs::remove_file(struct_file.clone())?;
+                }
+                if seg_file.exists() {
+                    std::fs::remove_file(seg_file.clone())?;
+                }
+                if seq_file.exists() {
+                    std::fs::remove_file(seq_file.clone())?;
+                }
             }
 
             if struct_file.exists() {
@@ -252,6 +263,38 @@ fn main() -> Result<(), anyhow::Error> {
             args.push(CString::new(klen.to_string()).unwrap());
             args.push(CString::new("--track-short-seqs").unwrap());
 
+            // check if the provided work directory exists.
+            // If not, then try and create it.
+            match work_dir.try_exists() {
+                Ok(true) => {
+                    info!(
+                        "will use {} as the work directory for temporary files.",
+                        work_dir.display()
+                    );
+                }
+                Ok(false) => {
+                    // try to create it
+                    match std::fs::create_dir_all(&work_dir) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            error!("when attempting to create working directory {}, encountered error {:#?}", &work_dir.display(), e);
+                            bail!(
+                                "Failed to create working directory {} for index construction : {:#?}",
+                                &work_dir.display(),
+                                e
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("when checking existence of working directory {:#?}", e);
+                    bail!(
+                        "Failed to create working directory for index construction : {:#?}",
+                        e
+                    );
+                }
+            }
+
             // check if the provided output path is more than just a prefix
             // if so, check if the specified directory exists and create it
             // if it doesn't.
@@ -273,6 +316,9 @@ fn main() -> Result<(), anyhow::Error> {
             // output format
             args.push(CString::new("-f").unwrap());
             args.push(CString::new("3").unwrap());
+            // work directory
+            args.push(CString::new("-w").unwrap());
+            args.push(CString::new(work_dir.as_path().to_string_lossy().into_owned()).unwrap());
 
             info!("args = {:?}", args);
             {
@@ -299,6 +345,10 @@ fn main() -> Result<(), anyhow::Error> {
             }
             args.push(CString::new("-o").unwrap());
             args.push(CString::new(output.as_path().to_string_lossy().into_owned()).unwrap());
+
+            args.push(CString::new("-d").unwrap());
+            args.push(CString::new(work_dir.as_path().to_string_lossy().into_owned()).unwrap());
+
             if quiet {
                 args.push(CString::new("--quiet").unwrap());
             }
@@ -317,25 +367,33 @@ fn main() -> Result<(), anyhow::Error> {
             if !keep_intermediate_dbg {
                 info!("removing intermediate cdBG files produced by cuttlefish.");
 
-                 match std::fs::remove_file(seg_file.clone()) {
+                match std::fs::remove_file(seg_file.clone()) {
                     Ok(_) => {
-                      info!("removed segment file {}", seg_file.display());
-                    },
+                        info!("removed segment file {}", seg_file.display());
+                    }
                     Err(e) => {
-                      warn!("cannot remove {}, encountered error {:?}!", seg_file.display(), e);
+                        warn!(
+                            "cannot remove {}, encountered error {:?}!",
+                            seg_file.display(),
+                            e
+                        );
                     }
                 };
 
                 match std::fs::remove_file(seq_file.clone()) {
                     Ok(_) => {
-                      info!("removed tiling file {}", seq_file.display());
-                    },
+                        info!("removed tiling file {}", seq_file.display());
+                    }
                     Err(e) => {
-                      warn!("cannot remove {}, encountered error {:?}!", seq_file.display(), e);
+                        warn!(
+                            "cannot remove {}, encountered error {:?}!",
+                            seq_file.display(),
+                            e
+                        );
                     }
                 };
-                // for now, let the json file stick around. It's 
-                // generally very small and may contain useful information 
+                // for now, let the json file stick around. It's
+                // generally very small and may contain useful information
                 // about the references being indexed.
             }
 
@@ -355,9 +413,8 @@ fn main() -> Result<(), anyhow::Error> {
             let r1_string = read1.join(",");
             let r2_string = read2.join(",");
 
-            let mut idx_suffixes: Vec<String> = vec![
-                "sshash".into(), "ctab".into(), "refinfo".into()
-            ];
+            let mut idx_suffixes: Vec<String> =
+                vec!["sshash".into(), "ctab".into(), "refinfo".into()];
 
             let mut args: Vec<CString> = vec![
                 CString::new("sc_ref_mapper").unwrap(),
