@@ -350,6 +350,9 @@ fn main() -> Result<(), anyhow::Error> {
             args.push(CString::new("-d").unwrap());
             args.push(CString::new(work_dir.as_path().to_string_lossy().into_owned()).unwrap());
 
+            args.push(CString::new("-t").unwrap());
+            args.push(CString::new(threads.to_string()).unwrap());
+
             if quiet {
                 args.push(CString::new("--quiet").unwrap());
             }
