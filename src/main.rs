@@ -108,7 +108,7 @@ enum Commands {
         #[arg(short = '1', long, value_delimiter = ',', required = true)]
         read1: Vec<String>,
 
-        /// path to list of read 1 files
+        /// path to list of read 2 files
         #[arg(short = '2', long, value_delimiter = ',', required = true)]
         read2: Vec<String>,
 
@@ -143,7 +143,7 @@ enum Commands {
         #[arg(short = '1', long, value_delimiter = ',', required = true)]
         read1: Vec<String>,
 
-        /// path to list of read 1 files
+        /// path to list of read 2 files
         #[arg(short = '2', long, value_delimiter = ',', required = true)]
         read2: Vec<String>,
 
