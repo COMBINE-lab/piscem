@@ -337,9 +337,14 @@ fn main() -> Result<(), anyhow::Error> {
 
             args.clear();
             args.push(CString::new("ref_index_builder").unwrap());
+
+            args.push(CString::new("-i").unwrap());
             args.push(CString::new(cf_out.as_path().to_string_lossy().into_owned()).unwrap());
+            args.push(CString::new("-k").unwrap());
             args.push(CString::new(klen.to_string()).unwrap());
+            args.push(CString::new("-m").unwrap());
             args.push(CString::new(mlen.to_string()).unwrap()); // minimizer length
+
             args.push(CString::new("--canonical-parsing").unwrap());
             if !no_ec_table {
                 args.push(CString::new("--build-ec-table").unwrap());
