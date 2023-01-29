@@ -29,17 +29,6 @@ fn main() {
         (*cfg_cf).define("CONDA_BUILD", "TRUE");
         (*cfg_cf).define("CMAKE_OSX_DEPLOYMENT_TARGET", "10.15");
         (*cfg_cf).define("MACOSX_SDK_VERSION", "10.15");
-
-        if cfg!(macos) {
-            if let Ok(cppflags) = env::var("CPPFLAGS") {
-                let cppflags_new = cppflags.replace("-mmacosx-version-min=10.9", "-mmacosx-version-min=10.15");
-                env::set_var("CPPFLAGS", cppflags_new);
-            }
-            if let Ok(cmake_args) = env::var("CMAKE_ARGS") {
-                let cmake_args_new = cmake_args.replace("-mmacosx-version-min=10.9", "-mmacosx-version-min=10.15");
-                env::set_var("CMAKE_ARGS", cmake_args_new);
-            }
-        }
         is_conda_build = true;
     }
 
