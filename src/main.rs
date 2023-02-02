@@ -6,6 +6,7 @@ use std::str::FromStr;
 
 use anyhow::{bail, Result};
 use clap::{ArgGroup, Parser, Subcommand};
+use num_cpus;
 use tracing::{error, info, warn, Level};
 
 #[link(name = "pesc_static", kind = "static")]
@@ -175,6 +176,8 @@ fn main() -> Result<(), anyhow::Error> {
             .init();
     }
 
+    let ncpus = num_cpus::get();
+
     match cli_args.command {
         Commands::Build {
             ref_seqs,
@@ -190,12 +193,23 @@ fn main() -> Result<(), anyhow::Error> {
             no_ec_table,
         } => {
             info!("starting piscem build");
-            assert!(
-                mlen < klen,
-                "minimizer length ({}) >= k-mer len ({})",
-                mlen,
-                klen
-            );
+            if !(threads > 0) {
+                bail!(
+                    "the number of provided threads ({}) must be greater than 0.",
+                    threads
+                );
+            }
+            if threads > ncpus {
+                bail!("the number of provided threads ({}) should be <= the number of logical CPUs ({}).",
+                    threads, ncpus);
+            }
+            if mlen >= klen {
+                bail!(
+                    "minimizer length ({}) must be < k-mer length ({})",
+                    mlen,
+                    klen
+                );
+            }
 
             let mut args: Vec<CString> = vec![];
 
@@ -426,6 +440,17 @@ fn main() -> Result<(), anyhow::Error> {
             check_ambig_hits,
             max_ec_card,
         } => {
+            if !(threads > 0) {
+                bail!(
+                    "the number of provided threads ({}) must be greater than 0.",
+                    threads
+                );
+            }
+            if threads > ncpus {
+                bail!("the number of provided threads ({}) should be <= the number of logical CPUs ({}).",
+                    threads, ncpus);
+            }
+
             let r1_string = read1.join(",");
             let r2_string = read2.join(",");
 
@@ -484,6 +509,17 @@ fn main() -> Result<(), anyhow::Error> {
             threads,
             output,
         } => {
+            if !(threads > 0) {
+                bail!(
+                    "the number of provided threads ({}) must be greater than 0.",
+                    threads
+                );
+            }
+            if threads > ncpus {
+                bail!("the number of provided threads ({}) should be <= the number of logical CPUs ({}).",
+                    threads, ncpus);
+            }
+
             let r1_string = read1.join(",");
             let r2_string = read2.join(",");
 

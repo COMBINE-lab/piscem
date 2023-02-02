@@ -6,6 +6,8 @@ fn main() {
     let custom_cxx = env::var("CXX");
     let conda_build = env::var("CONDA_BUILD");
     let nopie_build = env::var("NOPIE");
+    let nobmi2_var = env::var("NO_BMI2");
+
     let mut is_conda_build = false;
 
     println!("cargo:rerun-if-changed=cuttlefish/CMakeLists.txt");
@@ -30,6 +32,15 @@ fn main() {
         (*cfg_cf).define("CMAKE_OSX_DEPLOYMENT_TARGET", "10.15");
         (*cfg_cf).define("MACOSX_SDK_VERSION", "10.15");
         is_conda_build = true;
+    }
+
+    if let Ok(nobmi2) = nobmi2_var {
+        match nobmi2.as_str() {
+            "1" | "TRUE" | "true" | "True" => {
+                (*cfg_piscem_cpp).define("NO_BMI2", "TRUE");
+            }
+            _ => {}
+        }
     }
 
     (*cfg_piscem_cpp).always_configure(false);
