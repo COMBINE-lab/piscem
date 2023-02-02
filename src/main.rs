@@ -1,4 +1,5 @@
 use std::ffi::CString;
+use std::io;
 use std::os::raw::{c_char, c_int};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -163,9 +164,15 @@ fn main() -> Result<(), anyhow::Error> {
 
     let quiet = cli_args.quiet;
     if quiet {
-        tracing_subscriber::fmt().with_max_level(Level::WARN).init();
+        tracing_subscriber::fmt()
+            .with_max_level(Level::WARN)
+            .with_writer(io::stderr)
+            .init();
     } else {
-        tracing_subscriber::fmt().with_max_level(Level::INFO).init();
+        tracing_subscriber::fmt()
+            .with_max_level(Level::INFO)
+            .with_writer(io::stderr)
+            .init();
     }
 
     match cli_args.command {
