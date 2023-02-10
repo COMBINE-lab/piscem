@@ -68,8 +68,8 @@ fn main() {
     );
 
     println!("cargo:rustc-link-lib=static=kmc_core");
-    println!("cargo:rustc-link-lib=static=pesc_static");
-    println!("cargo:rustc-link-lib=static=build_static");
+    //println!("cargo:rustc-link-lib=static=pesc_static");
+    //println!("cargo:rustc-link-lib=static=build_static");
     println!("cargo:rustc-link-lib=static=sshash_static");
     println!("cargo:rustc-link-lib=static=z");
     println!("cargo:rustc-link-lib=static=bz2");
