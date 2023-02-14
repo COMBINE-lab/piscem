@@ -55,21 +55,20 @@ Usage
 =====
 
 ```
-piscem 0.1.0
 Indexing and mapping to compacted colored de Bruijn graphs
 
-USAGE:
-    piscem <SUBCOMMAND>
+Usage: piscem [OPTIONS] <COMMAND>
 
-OPTIONS:
-    -h, --help       Print help information
-    -V, --version    Print version information
+Commands:
+  build     Index a reference sequence
+  map-sc    map reads for single-cell processing
+  map-bulk  map reads for bulk processing
+  help      Print this message or the help of the given subcommand(s)
 
-SUBCOMMANDS:
-    build       Index a reference sequence
-    help        Print this message or the help of the given subcommand(s)
-    map-bulk    map reads for bulk processing
-    map-sc      map reads for single-cell processing
+Options:
+  -q, --quiet    be quiet (no effect yet for cDBG building phase of indexing)
+  -h, --help     Print help
+  -V, --version  Print version
 ```
 
 `piscem` has several sub-commands; `build`, `map-sc` and `map-bulk` described below.
@@ -80,31 +79,38 @@ Info for different sub-commands
 build
 -----
 
-The build subcommand indexes one or more reference sequences, building a piscem index over them.  The usage is as so:
+> **Note**
+> Since the build process makes use of [KMC3](https://github.com/refresh-bio/KMC) for a k-mer enumeration step, which, in turn, makes use of intermediate files to keep memory usage low, **you will likely need to increase the default number of file handles that can be open at once**.  Before running the `build` command, you can do this by running `ulimit -n 2048` in the terminal where you execute the `build` command.  You can also put this command in any script that you will use to run `piscem build`, or add it to your shell initalization scripts / profiles so that it is the default for new shells that you start
+
+The build subcommand indexes one or more reference sequences, building a piscem index over them. The usage for the command is as so:
 
 ```
-piscem-build
 Index a reference sequence
 
-USAGE:
-    piscem build [OPTIONS] --klen <KLEN> --mlen <MLEN> --threads <THREADS> --output <OUTPUT> <--ref-seqs <REF_SEQS>|--ref-lists <REF_LISTS>|--ref-dirs <REF_DIRS>>
+Usage: piscem build [OPTIONS] --klen <KLEN> --mlen <MLEN> --threads <THREADS> --output <OUTPUT> <--ref-seqs <REF_SEQS>|--ref-lists <REF_LISTS>|--ref-dirs <REF_DIRS>>
 
-OPTIONS:
-    -d, --ref-dirs <REF_DIRS>      ',' separated list of directories (all FASTA files in each directory will be indexed, but not recursively)
-    -h, --help                     Print help information
-    -k, --klen <KLEN>              length of k-mer to use
-    -l, --ref-lists <REF_LISTS>    ',' separated list of files (each listing input FASTA files)
-    -m, --mlen <MLEN>              length of minimizer to use
-    -o, --output <OUTPUT>          output file stem
-    -q                             be quiet during the indexing phase (no effect yet for cDBG building)
-    -s, --ref-seqs <REF_SEQS>      ',' separated list of reference FASTA files
-    -t, --threads <THREADS>        number of threads to use
+Options:
+  -s, --ref-seqs <REF_SEQS>    ',' separated list of reference FASTA files
+  -l, --ref-lists <REF_LISTS>  ',' separated list of files (each listing input FASTA files)
+  -d, --ref-dirs <REF_DIRS>    ',' separated list of directories (all FASTA files in each directory will be indexed, but not recursively)
+  -k, --klen <KLEN>            length of k-mer to use
+  -m, --mlen <MLEN>            length of minimizer to use
+  -t, --threads <THREADS>      number of threads to use
+  -o, --output <OUTPUT>        output file stem
+      --keep-intermediate-dbg  retain the reduced format GFA files produced by cuttlefish that describe the reference cDBG (the default is to remove these)
+  -w, --work-dir <WORK_DIR>    working directory where temporary files should be placed [default: .]
+      --overwrite              overwite an existing index if the output path is the same
+      --no-ec-table            skip the construction of the equivalence class lookup table when building the index
+  -h, --help                   Print help
+  -V, --version                Print version
 ```
 
 The parameters should be reasonably self-expalanatory.  The `-k` parameter is the k-mer size for the underlying colored compacted de Bruijn graph, and the `-m` parameter is the minimizer size used to build the [`sshash`](https://github.com/jermp/sshash) data structure.  The quiet `-q` flag applies to the `sshash` indexing step (not yet the CdBG construction step) and will prevent extra output being written to `stderr`.
 
 Finally, the `-r` argument takes a list of `FASTA` format files containing the references to be indexed.  Here, if there is more than one reference, they should be provided to `-r` in the form of a `,` separated list.  For example, if you wish to index `ref1.fa`, `ref2.fa`, `ref3.fa` then your invocation should include `-r ref1.fa,ref2.fa,ref3.fa`.  The references present within all of the `FASTA` files will be indexed by the `build` command.
 
+> **Note**
+> You should ensure that the `-t` parameter is less than the number of physical cores that you have on your system. _Specifically_, if you are running on an Apple silicon machine, it is highly recommended that you set `-t` to be less than or equal to the number of **high performance** cores that you have (rather than the total number of cores including efficiency cores), as using efficiency cores in the `piscem build` step has been observed to severely degrade performance.
 
 map-sc
 ------
@@ -112,21 +118,22 @@ map-sc
 The `map-sc` command maps single-cell sequencing reads against a piscem index, and produces a RAD format output file that can be processed by [`alevin-fry`](https://github.com/COMBINE-lab/alevin-fry).  The usage is as so:
 
 ```
-piscem-map-sc
-map sc reads
+map reads for single-cell processing
 
-USAGE:
-    piscem map-sc [OPTIONS] --index <INDEX> --geometry <GEOMETRY> --threads <THREADS> --output <OUTPUT>
+Usage: piscem map-sc [OPTIONS] --index <INDEX> --geometry <GEOMETRY> --read1 <READ1> --read2 <READ2> --threads <THREADS> --output <OUTPUT>
 
-OPTIONS:
-    -1, --read1 <READ1>          path to list of read 1 files
-    -2, --read2 <READ2>          path to list of read 1 files
-    -g, --geometry <GEOMETRY>    geometry of barcode, umi and read
-    -h, --help                   Print help information
-    -i, --index <INDEX>          input index prefix
-    -o, --output <OUTPUT>        path to output directory
-    -q                           be quiet during mapping
-    -t, --threads <THREADS>      number of threads to use
+Options:
+  -i, --index <INDEX>              input index prefix
+  -g, --geometry <GEOMETRY>        geometry of barcode, umi and read
+  -1, --read1 <READ1>              path to list of read 1 files
+  -2, --read2 <READ2>              path to list of read 2 files
+  -t, --threads <THREADS>          number of threads to use
+  -o, --output <OUTPUT>            path to output directory
+      --check-ambig-hits           enable extra checking of the equivalence classes of k-mers that were too ambiguous to be included in chaining (may improve specificity, but could slow down
+                                   mapping slightly)
+  -m, --max-ec-card <MAX_EC_CARD>  determines the maximum cardinality equivalence class (number of (txp, orientation status) pairs) to examine if performing check-ambig-hits [default: 256]
+  -h, --help                       Print help
+  -V, --version                    Print version
 ```
 
 Here, you can provide multiple files to `-1` and `-2` as a `,` separated list just like the `-r` argument to the `build` command. Of course, it is important to ensure that you provide that information in the same order to the `-1` and `-2` flags.  The `--geometry` flag specifies the geometry of the UMIs and cell barcodes for the reads; you can find a description [here](https://github.com/COMBINE-lab/piscem/blob/main/README.md#geometry).
@@ -137,20 +144,18 @@ map-bulk
 The `map-bulk` command maps bulk sequencing reads against a piscem index. The tool performs _non-spliced_ alignment, and therefore is applicable to e.g. metagenomic reads against a set of metagenomes, DNA-seq alignment against one or more references, or RNA-seq alignment against a transcriptome (but not a genome). The program and produces a bulk RAD format output file that can be processed by [`piscem-infer`](https://github.com/COMBINE-lab/piscem-infer) to estimate the abundances of all references in the index given the mapped reads.  The usage is as so:
 
 ```
-piscem-map-bulk
-map bulk reads
+map reads for bulk processing
 
-USAGE:
-    piscem map-bulk [OPTIONS] --index <INDEX> --read1 <READ1> --read2 <READ2> --threads <THREADS> --output <OUTPUT>
+Usage: piscem map-bulk --index <INDEX> --read1 <READ1> --read2 <READ2> --threads <THREADS> --output <OUTPUT>
 
-OPTIONS:
-    -1, --read1 <READ1>        path to list of read 1 files
-    -2, --read2 <READ2>        path to list of read 1 files
-    -h, --help                 Print help information
-    -i, --index <INDEX>        input index prefix
-    -o, --output <OUTPUT>      path to output directory
-    -q                         be quiet during mapping
-    -t, --threads <THREADS>    number of threads to use
+Options:
+  -i, --index <INDEX>      input index prefix
+  -1, --read1 <READ1>      path to list of read 1 files
+  -2, --read2 <READ2>      path to list of read 2 files
+  -t, --threads <THREADS>  number of threads to use
+  -o, --output <OUTPUT>    path to output directory
+  -h, --help               Print help
+  -V, --version            Print version
 ```
 
 Here, you can provide multiple files to `-1` and `-2` as a `,` separated list just like the `-r` argument to the `build` command. Of course, it is important to ensure that you provide that information in the same order to the `-1` and `-2` flags.
