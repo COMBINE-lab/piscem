@@ -1,6 +1,6 @@
 [package]
 name = "piscem"
-version = "0.6.2"
+version = "0.6.3"
 edition = "2021"
 build = "build.rs"
 
@@ -12,7 +12,7 @@ cmake = "0.1"
 [dependencies]
 num_cpus = "1.16.0"
 anyhow = "1.0"
-clap = { version = "4.3.24", features = ["cargo", "derive", "env", "wrap_help"] }
+clap = { version = "4.4.0", features = ["cargo", "derive", "env", "wrap_help"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", default-features = true, features = ["env-filter"] }
 
