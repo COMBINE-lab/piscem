@@ -38,6 +38,11 @@ struct Cli {
     command: Commands,
 }
 
+pub trait AsArgv {
+    fn as_argv(&self) -> Vec<CString>;
+}
+
+
 #[derive(Args, Clone, Debug)]
 pub struct MapSCOpts {
     /// input index prefix
@@ -109,6 +114,62 @@ pub struct MapSCOpts {
     /// their mappings reported.
     #[arg(long, default_value_t = 2500, help_heading = "Advanced options")]
     max_read_occ: u32,
+}
+
+impl AsArgv for MapSCOpts {
+    fn as_argv(&self) -> Vec<CString> {
+        let r1_string = self.read1.join(",");
+        let r2_string = self.read2.join(",");
+
+        let mut args: Vec<CString> = vec![
+            CString::new("sc_ref_mapper").unwrap(),
+            CString::new("-i").unwrap(),
+            CString::new(self.index.clone()).unwrap(),
+            CString::new("-g").unwrap(),
+            CString::new(self.geometry.clone()).unwrap(),
+            CString::new("-1").unwrap(),
+            CString::new(r1_string.as_str()).unwrap(),
+            CString::new("-2").unwrap(),
+            CString::new(r2_string.as_str()).unwrap(),
+            CString::new("-t").unwrap(),
+            CString::new(self.threads.to_string()).unwrap(),
+            CString::new("-o").unwrap(),
+            CString::new(self.output.as_str()).unwrap(),
+        ];
+
+        if self.ignore_ambig_hits {
+            args.push(CString::new("--ignore-ambig-hits").unwrap());
+        } else {
+            args.push(CString::new("--max-ec-card").unwrap());
+            args.push(CString::new(self.max_ec_card.to_string()).unwrap());
+            //idx_suffixes.push("ectab".into());
+        }
+
+        if self.no_poison {
+            args.push(CString::new("--no-poison").unwrap());
+        }
+
+        args.push(CString::new("--skipping-strategy").unwrap());
+        args.push(CString::new(self.skipping_strategy.to_string()).unwrap());
+
+        if self.struct_constraints {
+            args.push(CString::new("--struct-constraints").unwrap());
+        }
+
+        args.push(CString::new("--max-hit-occ").unwrap());
+        args.push(CString::new(self.max_hit_occ.to_string()).unwrap());
+
+        args.push(CString::new("--max-hit-occ-recover").unwrap());
+        args.push(CString::new(self.max_hit_occ_recover.to_string()).unwrap());
+
+        args.push(CString::new("--max-read-occ").unwrap());
+        args.push(CString::new(self.max_read_occ.to_string()).unwrap());
+
+        //if self.quiet {
+        //args.push(CString::new("--quiet").unwrap());
+        //}
+        args
+    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -538,33 +599,20 @@ fn main() -> Result<(), anyhow::Error> {
             info!("piscem build finished");
         }
 
-        Commands::MapSC(MapSCOpts {
-            index,
-            geometry,
-            read1,
-            read2,
-            threads,
-            output,
-            no_poison,
-            struct_constraints,
-            skipping_strategy,
-            ignore_ambig_hits,
-            max_ec_card,
-            max_hit_occ,
-            max_hit_occ_recover,
-            max_read_occ,
-        }) => {
-            if !(threads > 0) {
+        Commands::MapSC(sc_opts) => {
+            if !(sc_opts.threads > 0) {
                 bail!(
                     "the number of provided threads ({}) must be greater than 0.",
-                    threads
+                    sc_opts.threads
                 );
             }
-            if threads > ncpus {
+            if sc_opts.threads > ncpus {
                 bail!("the number of provided threads ({}) should be <= the number of logical CPUs ({}).",
-                    threads, ncpus);
+                    sc_opts.threads, ncpus);
             }
 
+            let args = sc_opts.as_argv();
+            /*
             let r1_string = read1.join(",");
             let r2_string = read2.join(",");
 
@@ -626,7 +674,7 @@ fn main() -> Result<(), anyhow::Error> {
             if quiet {
                 args.push(CString::new("--quiet").unwrap());
             }
-
+            */
             info!("cmd: {:?}", args);
             let arg_ptrs: Vec<*const c_char> = args.iter().map(|s| s.as_ptr()).collect();
             let args_len: c_int = args.len() as c_int;
