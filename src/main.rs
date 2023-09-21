@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::{bail, Result};
-use clap::{ArgGroup, Parser, Subcommand};
+use clap::{Args, ArgGroup, Parser, Subcommand};
 use num_cpus;
 use tracing::{error, info, warn, Level};
 
@@ -18,6 +18,7 @@ extern "C" {
 #[link(name = "build_static", kind = "static")]
 extern "C" {
     pub fn run_build(args: c_int, argsv: *const *const c_char) -> c_int;
+    pub fn run_build_poison_table(args: c_int, argsv: *const *const c_char) -> c_int;
 }
 
 #[link(name = "cfcore_static", kind = "static", modifiers = "+whole-archive")]
@@ -35,6 +36,79 @@ struct Cli {
     quiet: bool,
     #[command(subcommand)]
     command: Commands,
+}
+
+#[derive(Args, Clone, Debug)]
+pub struct MapSCOpts {
+    /// input index prefix
+    #[arg(short, long)]
+    index: String,
+
+    /// geometry of barcode, umi and read
+    #[arg(short, long)]
+    geometry: String,
+
+    /// path to list of read 1 files
+    #[arg(short = '1', long, value_delimiter = ',', required = true)]
+    read1: Vec<String>,
+
+    /// path to list of read 2 files
+    #[arg(short = '2', long, value_delimiter = ',', required = true)]
+    read2: Vec<String>,
+
+    /// number of threads to use
+    #[arg(short, long)]
+    threads: usize,
+
+    /// path to output directory
+    #[arg(short, long)]
+    output: String,
+
+    /// do not consider poison k-mers, even if the underlying index contains them.
+    /// In this case, the mapping results will be identical to those obtained as if
+    /// no poison table was added to the index.
+    #[arg(long)]
+    no_poison: bool,
+
+    /// apply structural constraints when performing mapping.
+    #[arg(short = 'c', long)]
+    struct_constraints: bool,
+
+    // skipping strategy to use for k-mer collection
+    #[arg(long, default_value = "permissive", value_parser = clap::builder::PossibleValuesParser::new(["permissive", "strict"]))]
+    skipping_strategy: String,
+
+    /// skip checking of the equivalence classes of k-mers that were too
+    /// ambiguous to be otherwise considered (passing this flag can speed up
+    /// mapping slightly, but may reduce specificity).
+    #[arg(long)]
+    ignore_ambig_hits: bool,
+
+    /// determines the maximum cardinality equivalence class
+    /// (number of (txp, orientation status) pairs) to examine if performing check-ambig-hits.
+    #[arg(
+        long,
+        short,
+        requires = "check_ambig_hits",
+        default_value_t = 4096,
+        conflicts_with = "ignore_ambig_hits",
+        help_heading = "Advanced options"
+    )]
+    max_ec_card: u32,
+
+    /// in the first pass, consider only k-mers having <= --max-hit-occ hits.
+    #[arg(long, default_value_t = 256, help_heading = "Advanced options")]
+    max_hit_occ: u32,
+
+    /// if all k-mers have > --max-hit-occ hits, then make a second pass and consider k-mers
+    /// having <= --max-hit-occ-recover hits.
+    #[arg(long, default_value_t = 1024, help_heading = "Advanced options")]
+    max_hit_occ_recover: u32,
+
+    /// reads with more than this number of mappings will not have
+    /// their mappings reported.
+    #[arg(long, default_value_t = 2500, help_heading = "Advanced options")]
+    max_read_occ: u32,
 }
 
 #[derive(Debug, Subcommand)]
@@ -90,49 +164,19 @@ enum Commands {
         overwrite: bool,
 
         /// skip the construction of the equivalence class lookup table
-        /// when building the index.
+        /// when building the index (not recommended).
         #[arg(long)]
         no_ec_table: bool,
+
+        /// path to (optional) decoy sequence used to insert poison
+        /// k-mer information into the index.
+        #[arg(long)]
+        decoy_paths: Option<Vec<PathBuf>>,
     },
 
     /// map reads for single-cell processing
     #[command(arg_required_else_help = true)]
-    MapSC {
-        /// input index prefix
-        #[arg(short, long)]
-        index: String,
-
-        /// geometry of barcode, umi and read
-        #[arg(short, long)]
-        geometry: String,
-
-        /// path to list of read 1 files
-        #[arg(short = '1', long, value_delimiter = ',', required = true)]
-        read1: Vec<String>,
-
-        /// path to list of read 2 files
-        #[arg(short = '2', long, value_delimiter = ',', required = true)]
-        read2: Vec<String>,
-
-        /// number of threads to use
-        #[arg(short, long)]
-        threads: usize,
-
-        /// path to output directory
-        #[arg(short, long)]
-        output: String,
-
-        /// enable extra checking of the equivalence classes of k-mers that were too
-        /// ambiguous to be included in chaining (may improve specificity, but could slow down
-        /// mapping slightly).
-        #[arg(long)]
-        check_ambig_hits: bool,
-
-        /// determines the maximum cardinality equivalence class
-        /// (number of (txp, orientation status) pairs) to examine if performing check-ambig-hits.
-        #[arg(long, short, requires = "check_ambig_hits", default_value_t = 256)]
-        max_ec_card: u32,
-    },
+    MapSC(MapSCOpts),
 
     /// map reads for bulk processing
     #[command(arg_required_else_help = true)]
@@ -191,6 +235,7 @@ fn main() -> Result<(), anyhow::Error> {
             work_dir,
             overwrite,
             no_ec_table,
+            decoy_paths,
         } => {
             info!("starting piscem build");
             if !(threads > 0) {
@@ -211,6 +256,28 @@ fn main() -> Result<(), anyhow::Error> {
                 );
             }
 
+            // if the decoy sequences are provided, ensure they are valid paths
+            if let Some(ref decoys) = decoy_paths {
+                for d in decoys {
+                    match d.try_exists() {
+                        Ok(true) => {}
+                        Ok(false) => {
+                            bail!(
+                                "Path for decoy file {} seems not to point to a valid file",
+                                d.display()
+                            );
+                        }
+                        Err(e) => {
+                            bail!(
+                                "Error {} when checking the existence of decoy file {}",
+                                e,
+                                d.display()
+                            );
+                        }
+                    }
+                }
+            }
+
             let mut args: Vec<CString> = vec![];
 
             let cf_out = PathBuf::from(output.as_path().to_string_lossy().into_owned() + "_cfish");
@@ -218,6 +285,7 @@ fn main() -> Result<(), anyhow::Error> {
             let seg_file = cf_base_path.with_extension("cf_seg");
             let seq_file = cf_base_path.with_extension("cf_seq");
             let struct_file = cf_base_path.with_extension("json");
+            let mut build_ret;
 
             if overwrite {
                 if struct_file.exists() {
@@ -238,8 +306,6 @@ fn main() -> Result<(), anyhow::Error> {
                     bail!("Cannot write over existing index without the --overwrite flag.");
                 }
             }
-
-            let mut build_ret;
 
             args.push(CString::new("cdbg_builder").unwrap());
 
@@ -394,6 +460,48 @@ fn main() -> Result<(), anyhow::Error> {
                 bail!("indexer returned exit code {}; failure.", build_ret);
             }
 
+            // now, build the poison table if there are decoys
+            if let Some(decoy_pathbufs) = decoy_paths {
+                args.clear();
+                args.push(CString::new("poison_table_builder").unwrap());
+
+                // index is the one we just built
+                args.push(CString::new("-i").unwrap());
+                args.push(CString::new(output.as_path().to_string_lossy().into_owned()).unwrap());
+
+                args.push(CString::new("-t").unwrap());
+                args.push(CString::new(threads.to_string()).unwrap());
+
+                if overwrite {
+                    args.push(CString::new("--overwrite").unwrap());
+                }
+
+                if quiet {
+                    args.push(CString::new("--quiet").unwrap());
+                }
+
+                let path_args = decoy_pathbufs
+                    .into_iter()
+                    .map(|x| x.to_string_lossy().into_owned())
+                    .collect::<Vec<String>>()
+                    .join(",");
+                args.push(CString::new("-d").unwrap());
+                args.push(CString::new(path_args).unwrap());
+
+                {
+                    println!("{:?}", args);
+                    let arg_ptrs: Vec<*const c_char> = args.iter().map(|s| s.as_ptr()).collect();
+                    let args_len: c_int = args.len() as c_int;
+                    build_ret = unsafe { run_build_poison_table(args_len, arg_ptrs.as_ptr()) };
+                }
+                if build_ret != 0 {
+                    bail!(
+                        "building poison table returned exit code {}; failure.",
+                        build_ret
+                    );
+                }
+            }
+
             if !keep_intermediate_dbg {
                 info!("removing intermediate cdBG files produced by cuttlefish.");
 
@@ -430,16 +538,22 @@ fn main() -> Result<(), anyhow::Error> {
             info!("piscem build finished");
         }
 
-        Commands::MapSC {
+        Commands::MapSC(MapSCOpts {
             index,
             geometry,
             read1,
             read2,
             threads,
             output,
-            check_ambig_hits,
+            no_poison,
+            struct_constraints,
+            skipping_strategy,
+            ignore_ambig_hits,
             max_ec_card,
-        } => {
+            max_hit_occ,
+            max_hit_occ_recover,
+            max_read_occ,
+        }) => {
             if !(threads > 0) {
                 bail!(
                     "the number of provided threads ({}) must be greater than 0.",
@@ -473,12 +587,33 @@ fn main() -> Result<(), anyhow::Error> {
                 CString::new(output.as_str()).unwrap(),
             ];
 
-            if check_ambig_hits {
-                args.push(CString::new("--check-ambig-hits").unwrap());
+            if ignore_ambig_hits {
+                args.push(CString::new("--ignore-ambig-hits").unwrap());
+            } else {
                 args.push(CString::new("--max-ec-card").unwrap());
                 args.push(CString::new(max_ec_card.to_string()).unwrap());
                 idx_suffixes.push("ectab".into());
             }
+
+            if no_poison {
+                args.push(CString::new("--no-poison").unwrap());
+            }
+
+            args.push(CString::new("--skipping-strategy").unwrap());
+            args.push(CString::new(skipping_strategy.to_string()).unwrap());
+
+            if struct_constraints {
+                args.push(CString::new("--struct-constraints").unwrap());
+            }
+
+            args.push(CString::new("--max-hit-occ").unwrap());
+            args.push(CString::new(max_hit_occ.to_string()).unwrap());
+
+            args.push(CString::new("--max-hit-occ-recover").unwrap());
+            args.push(CString::new(max_hit_occ_recover.to_string()).unwrap());
+
+            args.push(CString::new("--max-read-occ").unwrap());
+            args.push(CString::new(max_read_occ.to_string()).unwrap());
 
             let idx_path = PathBuf::from_str(&index)?;
             for s in idx_suffixes {
