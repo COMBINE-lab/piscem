@@ -45,7 +45,7 @@ pub(crate) struct MapSCOpts {
     #[arg(short = 'c', long)]
     pub struct_constraints: bool,
 
-    // the skipping strategy to use for k-mer collection
+    /// the skipping strategy to use for k-mer collection
     #[arg(long, default_value = "permissive", value_parser = clap::builder::PossibleValuesParser::new(["permissive", "strict"]))]
     pub skipping_strategy: String,
 
@@ -124,7 +124,7 @@ pub(crate) struct MapBulkOpts {
     #[arg(short = 'c', long)]
     pub struct_constraints: bool,
 
-    // skipping strategy to use for k-mer collection
+    /// skipping strategy to use for k-mer collection
     #[arg(long, default_value = "permissive", value_parser = clap::builder::PossibleValuesParser::new(["permissive", "strict"]))]
     pub skipping_strategy: String,
 
