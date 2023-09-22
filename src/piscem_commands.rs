@@ -1,6 +1,24 @@
 use clap::{ArgGroup, Args};
 use std::ffi::CString;
 
+trait DefaultMappingParams {
+    const MAX_EC_CARD: u32;
+    const MAX_HIT_OCC: u32;
+    const MAX_HIT_OCC_RECOVER: u32;
+    const MAX_READ_OCC: u32;
+    const SKIPPING_STRATEGY: &'static str;
+}
+
+struct DefaultParams;
+
+impl DefaultMappingParams for DefaultParams {
+    const MAX_EC_CARD: u32 = 4096;
+    const MAX_HIT_OCC: u32 = 256;
+    const MAX_HIT_OCC_RECOVER: u32 = 1024;
+    const MAX_READ_OCC: u32 = 2500;
+    const SKIPPING_STRATEGY: &'static str = "permissive";
+}
+
 /// Trait to produce a proper set of command-line arguments
 /// from a populated struct.  There is a single method,
 /// `as_argv`, which produces a Vec<CString> that can be parsed
@@ -46,7 +64,7 @@ pub(crate) struct MapSCOpts {
     pub struct_constraints: bool,
 
     /// the skipping strategy to use for k-mer collection
-    #[arg(long, default_value = "permissive", value_parser = clap::builder::PossibleValuesParser::new(["permissive", "strict"]))]
+    #[arg(long, default_value = &DefaultParams::SKIPPING_STRATEGY, value_parser = clap::builder::PossibleValuesParser::new(["permissive", "strict"]))]
     pub skipping_strategy: String,
 
     /// skip checking of the equivalence classes of k-mers that were too
@@ -62,24 +80,24 @@ pub(crate) struct MapSCOpts {
         long,
         short,
         requires = "check_ambig_hits",
-        default_value_t = 4096,
+        default_value_t = DefaultParams::MAX_EC_CARD,
         conflicts_with = "ignore_ambig_hits",
         help_heading = "Advanced options"
     )]
     pub max_ec_card: u32,
 
     /// in the first pass, consider only k-mers having <= --max-hit-occ hits.
-    #[arg(long, default_value_t = 256, help_heading = "Advanced options")]
+    #[arg(long, default_value_t = DefaultParams::MAX_HIT_OCC, help_heading = "Advanced options")]
     pub max_hit_occ: u32,
 
     /// if all k-mers have > --max-hit-occ hits, then make a second pass and consider k-mers
     /// having <= --max-hit-occ-recover hits.
-    #[arg(long, default_value_t = 1024, help_heading = "Advanced options")]
+    #[arg(long, default_value_t = DefaultParams::MAX_HIT_OCC_RECOVER, help_heading = "Advanced options")]
     pub max_hit_occ_recover: u32,
 
     /// reads with more than this number of mappings will not have
     /// their mappings reported.
-    #[arg(long, default_value_t = 2500, help_heading = "Advanced options")]
+    #[arg(long, default_value_t = DefaultParams::MAX_READ_OCC, help_heading = "Advanced options")]
     pub max_read_occ: u32,
 }
 
@@ -107,7 +125,7 @@ pub(crate) struct MapBulkOpts {
     pub reads: Option<Vec<String>>,
 
     /// number of threads to use
-    #[arg(short, long, default_value_t=16)]
+    #[arg(short, long, default_value_t = 16)]
     pub threads: usize,
 
     /// path to output directory
@@ -125,7 +143,7 @@ pub(crate) struct MapBulkOpts {
     pub struct_constraints: bool,
 
     /// skipping strategy to use for k-mer collection
-    #[arg(long, default_value = "permissive", value_parser = clap::builder::PossibleValuesParser::new(["permissive", "strict"]))]
+    #[arg(long, default_value = &DefaultParams::SKIPPING_STRATEGY, value_parser = clap::builder::PossibleValuesParser::new(["permissive", "strict"]))]
     pub skipping_strategy: String,
 
     /// skip checking of the equivalence classes of k-mers that were too
@@ -141,24 +159,24 @@ pub(crate) struct MapBulkOpts {
         long,
         short,
         requires = "check_ambig_hits",
-        default_value_t = 4096,
+        default_value_t = DefaultParams::MAX_EC_CARD,
         conflicts_with = "ignore_ambig_hits",
         help_heading = "Advanced options"
     )]
     pub max_ec_card: u32,
 
     /// in the first pass, consider only k-mers having <= --max-hit-occ hits.
-    #[arg(long, default_value_t = 256, help_heading = "Advanced options")]
+    #[arg(long, default_value_t = DefaultParams::MAX_HIT_OCC, help_heading = "Advanced options")]
     pub max_hit_occ: u32,
 
     /// if all k-mers have > --max-hit-occ hits, then make a second pass and consider k-mers
     /// having <= --max-hit-occ-recover hits.
-    #[arg(long, default_value_t = 1024, help_heading = "Advanced options")]
+    #[arg(long, default_value_t = DefaultParams::MAX_HIT_OCC_RECOVER, help_heading = "Advanced options")]
     pub max_hit_occ_recover: u32,
 
     /// reads with more than this number of mappings will not have
     /// their mappings reported.
-    #[arg(long, default_value_t = 2500, help_heading = "Advanced options")]
+    #[arg(long, default_value_t = DefaultParams::MAX_READ_OCC, help_heading = "Advanced options")]
     pub max_read_occ: u32,
 }
 
