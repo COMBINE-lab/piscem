@@ -6,7 +6,6 @@ use std::str::FromStr;
 
 use anyhow::{bail, Result};
 use clap::{ArgGroup, Args, Parser, Subcommand};
-use num_cpus;
 use tracing::{error, info, warn, Level};
 
 #[link(name = "pesc_static", kind = "static")]
@@ -38,6 +37,10 @@ struct Cli {
     command: Commands,
 }
 
+/// Trait to produce a proper set of command-line arguments
+/// from a populated struct.  There is a single method,
+/// `as_argv` which produces a Vec<CString> that can be parsed
+/// and passed to a C function as the `char** argv` parameter.
 pub trait AsArgv {
     fn as_argv(&self) -> Vec<CString>;
 }
@@ -247,7 +250,6 @@ impl AsArgv for MapSCOpts {
 
 impl AsArgv for MapBulkOpts {
     fn as_argv(&self) -> Vec<CString> {
-
         let mut args: Vec<CString> = vec![
             CString::new("bulk_ref_mapper").unwrap(),
             CString::new("-i").unwrap(),
@@ -276,7 +278,6 @@ impl AsArgv for MapBulkOpts {
         } else {
             args.push(CString::new("--max-ec-card").unwrap());
             args.push(CString::new(self.max_ec_card.to_string()).unwrap());
-            //idx_suffixes.push("ectab".into());
         }
 
         if self.no_poison {
@@ -299,13 +300,9 @@ impl AsArgv for MapBulkOpts {
         args.push(CString::new("--max-read-occ").unwrap());
         args.push(CString::new(self.max_read_occ.to_string()).unwrap());
 
-        //if self.quiet {
-        //args.push(CString::new("--quiet").unwrap());
-        //}
         args
     }
 }
-
 
 #[derive(Debug, Subcommand)]
 enum Commands {
@@ -414,7 +411,7 @@ fn main() -> Result<(), anyhow::Error> {
             decoy_paths,
         } => {
             info!("starting piscem build");
-            if !(threads > 0) {
+            if threads == 0 {
                 bail!(
                     "the number of provided threads ({}) must be greater than 0.",
                     threads
@@ -475,12 +472,10 @@ fn main() -> Result<(), anyhow::Error> {
                 }
             }
 
-            if struct_file.exists() {
-                if !seq_file.exists() || !seg_file.exists() {
-                    warn!("The prefix you have chosen for output already corresponds to an existing cDBG structure file {:?}.", struct_file.display());
-                    warn!("However, the corresponding seq and seg files do not exist. Please either delete this structure file, choose another output prefix, or use the --overwrite flag.");
-                    bail!("Cannot write over existing index without the --overwrite flag.");
-                }
+            if struct_file.exists() && (!seq_file.exists() || !seg_file.exists()) {
+                warn!("The prefix you have chosen for output already corresponds to an existing cDBG structure file {:?}.", struct_file.display());
+                warn!("However, the corresponding seq and seg files do not exist. Please either delete this structure file, choose another output prefix, or use the --overwrite flag.");
+                bail!("Cannot write over existing index without the --overwrite flag.");
             }
 
             args.push(CString::new("cdbg_builder").unwrap());
@@ -715,7 +710,7 @@ fn main() -> Result<(), anyhow::Error> {
         }
 
         Commands::MapSC(sc_opts) => {
-            if !(sc_opts.threads > 0) {
+            if sc_opts.threads == 0 {
                 bail!(
                     "the number of provided threads ({}) must be greater than 0.",
                     sc_opts.threads
@@ -757,7 +752,7 @@ fn main() -> Result<(), anyhow::Error> {
         }
 
         Commands::MapBulk(bulk_opts) => {
-            if !(bulk_opts.threads > 0) {
+            if bulk_opts.threads == 0 {
                 bail!(
                     "the number of provided threads ({}) must be greater than 0.",
                     bulk_opts.threads
@@ -782,7 +777,7 @@ fn main() -> Result<(), anyhow::Error> {
                     bail!("To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!", &bulk_opts.index, req_file.display());
                 }
             }
- 
+
             let mut args = bulk_opts.as_argv();
 
             if quiet {
