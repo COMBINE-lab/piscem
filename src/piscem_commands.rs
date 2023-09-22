@@ -3,7 +3,7 @@ use std::ffi::CString;
 
 /// Trait to produce a proper set of command-line arguments
 /// from a populated struct.  There is a single method,
-/// `as_argv` which produces a Vec<CString> that can be parsed
+/// `as_argv`, which produces a Vec<CString> that can be parsed
 /// and passed to a C function as the `char** argv` parameter.
 pub trait AsArgv {
     fn as_argv(&self) -> Vec<CString>;
@@ -28,7 +28,7 @@ pub(crate) struct MapSCOpts {
     pub read2: Vec<String>,
 
     /// number of threads to use
-    #[arg(short, long)]
+    #[arg(short, long, default_value_t = 16)]
     pub threads: usize,
 
     /// path to output directory
@@ -45,7 +45,7 @@ pub(crate) struct MapSCOpts {
     #[arg(short = 'c', long)]
     pub struct_constraints: bool,
 
-    // skipping strategy to use for k-mer collection
+    // the skipping strategy to use for k-mer collection
     #[arg(long, default_value = "permissive", value_parser = clap::builder::PossibleValuesParser::new(["permissive", "strict"]))]
     pub skipping_strategy: String,
 
@@ -56,7 +56,8 @@ pub(crate) struct MapSCOpts {
     pub ignore_ambig_hits: bool,
 
     /// determines the maximum cardinality equivalence class
-    /// (number of (txp, orientation status) pairs) to examine if performing check-ambig-hits.
+    /// (number of (txp, orientation status) pairs) to examine (cannot be used with
+    /// --ignore-ambig-hits).
     #[arg(
         long,
         short,
@@ -106,7 +107,7 @@ pub(crate) struct MapBulkOpts {
     pub reads: Option<Vec<String>>,
 
     /// number of threads to use
-    #[arg(short, long)]
+    #[arg(short, long, default_value_t=16)]
     pub threads: usize,
 
     /// path to output directory
@@ -134,7 +135,8 @@ pub(crate) struct MapBulkOpts {
     pub ignore_ambig_hits: bool,
 
     /// determines the maximum cardinality equivalence class
-    /// (number of (txp, orientation status) pairs) to examine if performing check-ambig-hits.
+    /// (number of (txp, orientation status) pairs) to examine (cannot be used with
+    /// --ignore-ambig-hits).
     #[arg(
         long,
         short,
