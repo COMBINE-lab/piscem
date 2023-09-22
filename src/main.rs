@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::{bail, Result};
-use clap::{Args, ArgGroup, Parser, Subcommand};
+use clap::{ArgGroup, Args, Parser, Subcommand};
 use num_cpus;
 use tracing::{error, info, warn, Level};
 
@@ -42,7 +42,6 @@ pub trait AsArgv {
     fn as_argv(&self) -> Vec<CString>;
 }
 
-
 #[derive(Args, Clone, Debug)]
 pub struct MapSCOpts {
     /// input index prefix
@@ -60,6 +59,84 @@ pub struct MapSCOpts {
     /// path to list of read 2 files
     #[arg(short = '2', long, value_delimiter = ',', required = true)]
     read2: Vec<String>,
+
+    /// number of threads to use
+    #[arg(short, long)]
+    threads: usize,
+
+    /// path to output directory
+    #[arg(short, long)]
+    output: String,
+
+    /// do not consider poison k-mers, even if the underlying index contains them.
+    /// In this case, the mapping results will be identical to those obtained as if
+    /// no poison table was added to the index.
+    #[arg(long)]
+    no_poison: bool,
+
+    /// apply structural constraints when performing mapping.
+    #[arg(short = 'c', long)]
+    struct_constraints: bool,
+
+    // skipping strategy to use for k-mer collection
+    #[arg(long, default_value = "permissive", value_parser = clap::builder::PossibleValuesParser::new(["permissive", "strict"]))]
+    skipping_strategy: String,
+
+    /// skip checking of the equivalence classes of k-mers that were too
+    /// ambiguous to be otherwise considered (passing this flag can speed up
+    /// mapping slightly, but may reduce specificity).
+    #[arg(long)]
+    ignore_ambig_hits: bool,
+
+    /// determines the maximum cardinality equivalence class
+    /// (number of (txp, orientation status) pairs) to examine if performing check-ambig-hits.
+    #[arg(
+        long,
+        short,
+        requires = "check_ambig_hits",
+        default_value_t = 4096,
+        conflicts_with = "ignore_ambig_hits",
+        help_heading = "Advanced options"
+    )]
+    max_ec_card: u32,
+
+    /// in the first pass, consider only k-mers having <= --max-hit-occ hits.
+    #[arg(long, default_value_t = 256, help_heading = "Advanced options")]
+    max_hit_occ: u32,
+
+    /// if all k-mers have > --max-hit-occ hits, then make a second pass and consider k-mers
+    /// having <= --max-hit-occ-recover hits.
+    #[arg(long, default_value_t = 1024, help_heading = "Advanced options")]
+    max_hit_occ_recover: u32,
+
+    /// reads with more than this number of mappings will not have
+    /// their mappings reported.
+    #[arg(long, default_value_t = 2500, help_heading = "Advanced options")]
+    max_read_occ: u32,
+}
+
+#[derive(Args, Clone, Debug)]
+#[command(group(
+        ArgGroup::new("read_source")
+        .required(true)
+        .args(["read1", "reads"])
+))]
+pub struct MapBulkOpts {
+    /// input index prefix
+    #[arg(short, long)]
+    index: String,
+
+    /// path to list of read 1 files
+    #[arg(short = '1', long, value_delimiter = ',', requires = "read2")]
+    read1: Option<Vec<String>>,
+
+    /// path to list of read 2 files
+    #[arg(short = '2', long, value_delimiter = ',', requires = "read1")]
+    read2: Option<Vec<String>>,
+
+    /// path to list of read unpaired read files
+    #[arg(short = 'r', long, value_delimiter = ',', conflicts_with_all = ["read1", "read2"])]
+    reads: Option<Vec<String>>,
 
     /// number of threads to use
     #[arg(short, long)]
@@ -142,6 +219,63 @@ impl AsArgv for MapSCOpts {
         } else {
             args.push(CString::new("--max-ec-card").unwrap());
             args.push(CString::new(self.max_ec_card.to_string()).unwrap());
+        }
+
+        if self.no_poison {
+            args.push(CString::new("--no-poison").unwrap());
+        }
+
+        args.push(CString::new("--skipping-strategy").unwrap());
+        args.push(CString::new(self.skipping_strategy.to_string()).unwrap());
+
+        if self.struct_constraints {
+            args.push(CString::new("--struct-constraints").unwrap());
+        }
+
+        args.push(CString::new("--max-hit-occ").unwrap());
+        args.push(CString::new(self.max_hit_occ.to_string()).unwrap());
+
+        args.push(CString::new("--max-hit-occ-recover").unwrap());
+        args.push(CString::new(self.max_hit_occ_recover.to_string()).unwrap());
+
+        args.push(CString::new("--max-read-occ").unwrap());
+        args.push(CString::new(self.max_read_occ.to_string()).unwrap());
+
+        args
+    }
+}
+
+impl AsArgv for MapBulkOpts {
+    fn as_argv(&self) -> Vec<CString> {
+
+        let mut args: Vec<CString> = vec![
+            CString::new("bulk_ref_mapper").unwrap(),
+            CString::new("-i").unwrap(),
+            CString::new(self.index.clone()).unwrap(),
+            CString::new("-t").unwrap(),
+            CString::new(self.threads.to_string()).unwrap(),
+            CString::new("-o").unwrap(),
+            CString::new(self.output.as_str()).unwrap(),
+        ];
+
+        if let Some(ref unpaired_reads) = &self.reads {
+            let r_string = unpaired_reads.clone().join(",");
+            args.push(CString::new("-r").unwrap());
+            args.push(CString::new(r_string.as_str()).unwrap());
+        } else if let (Some(ref r1), Some(ref r2)) = (&self.read1, &self.read2) {
+            let r1_string = r1.clone().join(",");
+            let r2_string = r2.clone().join(",");
+            args.push(CString::new("-1").unwrap());
+            args.push(CString::new(r1_string.as_str()).unwrap());
+            args.push(CString::new("-2").unwrap());
+            args.push(CString::new(r2_string.as_str()).unwrap());
+        }
+
+        if self.ignore_ambig_hits {
+            args.push(CString::new("--ignore-ambig-hits").unwrap());
+        } else {
+            args.push(CString::new("--max-ec-card").unwrap());
+            args.push(CString::new(self.max_ec_card.to_string()).unwrap());
             //idx_suffixes.push("ectab".into());
         }
 
@@ -171,6 +305,7 @@ impl AsArgv for MapSCOpts {
         args
     }
 }
+
 
 #[derive(Debug, Subcommand)]
 enum Commands {
@@ -241,27 +376,7 @@ enum Commands {
 
     /// map reads for bulk processing
     #[command(arg_required_else_help = true)]
-    MapBulk {
-        /// input index prefix
-        #[arg(short, long)]
-        index: String,
-
-        /// path to list of read 1 files
-        #[arg(short = '1', long, value_delimiter = ',', required = true)]
-        read1: Vec<String>,
-
-        /// path to list of read 2 files
-        #[arg(short = '2', long, value_delimiter = ',', required = true)]
-        read2: Vec<String>,
-
-        /// number of threads to use
-        #[arg(short, long)]
-        threads: usize,
-
-        /// path to output directory
-        #[arg(short, long)]
-        output: String,
-    },
+    MapBulk(MapBulkOpts),
 }
 
 fn main() -> Result<(), anyhow::Error> {
@@ -611,70 +726,26 @@ fn main() -> Result<(), anyhow::Error> {
                     sc_opts.threads, ncpus);
             }
 
-            let args = sc_opts.as_argv();
-            /*
-            let r1_string = read1.join(",");
-            let r2_string = read2.join(",");
-
             let mut idx_suffixes: Vec<String> =
                 vec!["sshash".into(), "ctab".into(), "refinfo".into()];
 
-            let mut args: Vec<CString> = vec![
-                CString::new("sc_ref_mapper").unwrap(),
-                CString::new("-i").unwrap(),
-                CString::new(index.clone()).unwrap(),
-                CString::new("-g").unwrap(),
-                CString::new(geometry).unwrap(),
-                CString::new("-1").unwrap(),
-                CString::new(r1_string.as_str()).unwrap(),
-                CString::new("-2").unwrap(),
-                CString::new(r2_string.as_str()).unwrap(),
-                CString::new("-t").unwrap(),
-                CString::new(threads.to_string()).unwrap(),
-                CString::new("-o").unwrap(),
-                CString::new(output.as_str()).unwrap(),
-            ];
-
-            if ignore_ambig_hits {
-                args.push(CString::new("--ignore-ambig-hits").unwrap());
-            } else {
-                args.push(CString::new("--max-ec-card").unwrap());
-                args.push(CString::new(max_ec_card.to_string()).unwrap());
+            if !sc_opts.ignore_ambig_hits {
                 idx_suffixes.push("ectab".into());
             }
 
-            if no_poison {
-                args.push(CString::new("--no-poison").unwrap());
-            }
-
-            args.push(CString::new("--skipping-strategy").unwrap());
-            args.push(CString::new(skipping_strategy.to_string()).unwrap());
-
-            if struct_constraints {
-                args.push(CString::new("--struct-constraints").unwrap());
-            }
-
-            args.push(CString::new("--max-hit-occ").unwrap());
-            args.push(CString::new(max_hit_occ.to_string()).unwrap());
-
-            args.push(CString::new("--max-hit-occ-recover").unwrap());
-            args.push(CString::new(max_hit_occ_recover.to_string()).unwrap());
-
-            args.push(CString::new("--max-read-occ").unwrap());
-            args.push(CString::new(max_read_occ.to_string()).unwrap());
-
-            let idx_path = PathBuf::from_str(&index)?;
+            let idx_path = PathBuf::from_str(&sc_opts.index)?;
             for s in idx_suffixes {
                 let req_file = idx_path.with_extension(s);
                 if !req_file.exists() {
-                    bail!("To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!", &index, req_file.display());
+                    bail!("To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!", &sc_opts.index, req_file.display());
                 }
             }
 
+            let mut args = sc_opts.as_argv();
             if quiet {
                 args.push(CString::new("--quiet").unwrap());
             }
-            */
+
             info!("cmd: {:?}", args);
             let arg_ptrs: Vec<*const c_char> = args.iter().map(|s| s.as_ptr()).collect();
             let args_len: c_int = args.len() as c_int;
@@ -685,40 +756,34 @@ fn main() -> Result<(), anyhow::Error> {
             }
         }
 
-        Commands::MapBulk {
-            index,
-            read1,
-            read2,
-            threads,
-            output,
-        } => {
-            if !(threads > 0) {
+        Commands::MapBulk(bulk_opts) => {
+            if !(bulk_opts.threads > 0) {
                 bail!(
                     "the number of provided threads ({}) must be greater than 0.",
-                    threads
+                    bulk_opts.threads
                 );
             }
-            if threads > ncpus {
+            if bulk_opts.threads > ncpus {
                 bail!("the number of provided threads ({}) should be <= the number of logical CPUs ({}).",
-                    threads, ncpus);
+                    bulk_opts.threads, ncpus);
             }
 
-            let r1_string = read1.join(",");
-            let r2_string = read2.join(",");
+            let mut idx_suffixes: Vec<String> =
+                vec!["sshash".into(), "ctab".into(), "refinfo".into()];
 
-            let mut args: Vec<CString> = vec![
-                CString::new("bulk_ref_mapper").unwrap(),
-                CString::new("-i").unwrap(),
-                CString::new(index).unwrap(),
-                CString::new("-1").unwrap(),
-                CString::new(r1_string.as_str()).unwrap(),
-                CString::new("-2").unwrap(),
-                CString::new(r2_string.as_str()).unwrap(),
-                CString::new("-t").unwrap(),
-                CString::new(threads.to_string()).unwrap(),
-                CString::new("-o").unwrap(),
-                CString::new(output.as_str()).unwrap(),
-            ];
+            if !bulk_opts.ignore_ambig_hits {
+                idx_suffixes.push("ectab".into());
+            }
+
+            let idx_path = PathBuf::from_str(&bulk_opts.index)?;
+            for s in idx_suffixes {
+                let req_file = idx_path.with_extension(s);
+                if !req_file.exists() {
+                    bail!("To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!", &bulk_opts.index, req_file.display());
+                }
+            }
+ 
+            let mut args = bulk_opts.as_argv();
 
             if quiet {
                 args.push(CString::new("--quiet").unwrap());
