@@ -2,10 +2,9 @@ use std::ffi::CString;
 use std::io;
 use std::os::raw::{c_char, c_int};
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use anyhow::{bail, Result};
-use clap::{ArgGroup, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use tracing::{error, info, warn, Level};
 
 mod piscem_commands;
@@ -44,64 +43,7 @@ struct Cli {
 enum Commands {
     /// Index a reference sequence
     #[command(arg_required_else_help = true)]
-    #[command(group(
-            ArgGroup::new("ref-input")
-            .required(true)
-            .args(&["ref_seqs", "ref_lists", "ref_dirs"]),
-            ))]
-    Build {
-        /// ',' separated list of reference FASTA files
-        #[arg(short = 's', long, value_delimiter = ',', required = true)]
-        ref_seqs: Option<Vec<String>>,
-
-        /// ',' separated list of files (each listing input FASTA files)
-        #[arg(short = 'l', long, value_delimiter = ',', required = true)]
-        ref_lists: Option<Vec<String>>,
-
-        /// ',' separated list of directories (all FASTA files in each directory will be indexed,
-        /// but not recursively).
-        #[arg(short = 'd', long, value_delimiter = ',', required = true)]
-        ref_dirs: Option<Vec<String>>,
-
-        /// length of k-mer to use
-        #[arg(short, long)]
-        klen: usize,
-
-        /// length of minimizer to use
-        #[arg(short, long)]
-        mlen: usize,
-
-        /// number of threads to use
-        #[arg(short, long)]
-        threads: usize,
-
-        /// output file stem
-        #[arg(short, long)]
-        output: PathBuf,
-
-        /// retain the reduced format GFA files produced by cuttlefish that
-        /// describe the reference cDBG (the default is to remove these).
-        #[arg(long)]
-        keep_intermediate_dbg: bool,
-
-        /// working directory where temporary files should be placed.
-        #[arg(short = 'w', long, default_value_os_t = PathBuf::from("."))]
-        work_dir: PathBuf,
-
-        /// overwite an existing index if the output path is the same.
-        #[arg(long)]
-        overwrite: bool,
-
-        /// skip the construction of the equivalence class lookup table
-        /// when building the index (not recommended).
-        #[arg(long)]
-        no_ec_table: bool,
-
-        /// path to (optional) decoy sequence used to insert poison
-        /// k-mer information into the index.
-        #[arg(long)]
-        decoy_paths: Option<Vec<PathBuf>>,
-    },
+    Build(BuildOpts),
 
     /// map reads for single-cell processing
     #[command(arg_required_else_help = true)]
@@ -132,7 +74,7 @@ fn main() -> Result<(), anyhow::Error> {
     let ncpus = num_cpus::get();
 
     match cli_args.command {
-        Commands::Build {
+        Commands::Build(BuildOpts {
             ref_seqs,
             ref_lists,
             ref_dirs,
@@ -145,7 +87,7 @@ fn main() -> Result<(), anyhow::Error> {
             overwrite,
             no_ec_table,
             decoy_paths,
-        } => {
+        }) => {
             info!("starting piscem build");
             if threads == 0 {
                 bail!(
@@ -383,10 +325,6 @@ fn main() -> Result<(), anyhow::Error> {
                     args.push(CString::new("--overwrite").unwrap());
                 }
 
-                if quiet {
-                    args.push(CString::new("--quiet").unwrap());
-                }
-
                 let path_args = decoy_pathbufs
                     .into_iter()
                     .map(|x| x.to_string_lossy().into_owned())
@@ -394,6 +332,10 @@ fn main() -> Result<(), anyhow::Error> {
                     .join(",");
                 args.push(CString::new("-d").unwrap());
                 args.push(CString::new(path_args).unwrap());
+
+                if quiet {
+                    args.push(CString::new("--quiet").unwrap());
+                }
 
                 {
                     println!("{:?}", args);
@@ -457,22 +399,7 @@ fn main() -> Result<(), anyhow::Error> {
                     sc_opts.threads, ncpus);
             }
 
-            let mut idx_suffixes: Vec<String> =
-                vec!["sshash".into(), "ctab".into(), "refinfo".into()];
-
-            if !sc_opts.ignore_ambig_hits {
-                idx_suffixes.push("ectab".into());
-            }
-
-            let idx_path = PathBuf::from_str(&sc_opts.index)?;
-            for s in idx_suffixes {
-                let req_file = idx_path.with_extension(s);
-                if !req_file.exists() {
-                    bail!("To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!", &sc_opts.index, req_file.display());
-                }
-            }
-
-            let mut args = sc_opts.as_argv();
+            let mut args = sc_opts.as_argv()?;
             if quiet {
                 args.push(CString::new("--quiet").unwrap());
             }
@@ -499,22 +426,7 @@ fn main() -> Result<(), anyhow::Error> {
                     bulk_opts.threads, ncpus);
             }
 
-            let mut idx_suffixes: Vec<String> =
-                vec!["sshash".into(), "ctab".into(), "refinfo".into()];
-
-            if !bulk_opts.ignore_ambig_hits {
-                idx_suffixes.push("ectab".into());
-            }
-
-            let idx_path = PathBuf::from_str(&bulk_opts.index)?;
-            for s in idx_suffixes {
-                let req_file = idx_path.with_extension(s);
-                if !req_file.exists() {
-                    bail!("To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!", &bulk_opts.index, req_file.display());
-                }
-            }
-
-            let mut args = bulk_opts.as_argv();
+            let mut args = bulk_opts.as_argv()?;
 
             if quiet {
                 args.push(CString::new("--quiet").unwrap());

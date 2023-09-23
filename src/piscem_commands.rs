@@ -1,5 +1,8 @@
+use anyhow::{bail, Result};
 use clap::{ArgGroup, Args};
 use std::ffi::CString;
+use std::path::PathBuf;
+use std::str::FromStr;
 
 trait DefaultMappingParams {
     const MAX_EC_CARD: u32;
@@ -24,7 +27,68 @@ impl DefaultMappingParams for DefaultParams {
 /// `as_argv`, which produces a Vec<CString> that can be parsed
 /// and passed to a C function as the `char** argv` parameter.
 pub trait AsArgv {
-    fn as_argv(&self) -> Vec<CString>;
+    fn as_argv(&self) -> Result<Vec<CString>>;
+}
+
+#[derive(Args, Clone, Debug)]
+#[command(arg_required_else_help = true)]
+#[command(group(
+    ArgGroup::new("ref-input")
+    .required(true)
+    .args(&["ref_seqs", "ref_lists", "ref_dirs"]),
+))]
+pub(crate) struct BuildOpts {
+    /// ',' separated list of reference FASTA files
+    #[arg(short = 's', long, value_delimiter = ',', required = true)]
+    pub ref_seqs: Option<Vec<String>>,
+
+    /// ',' separated list of files (each listing input FASTA files)
+    #[arg(short = 'l', long, value_delimiter = ',', required = true)]
+    pub ref_lists: Option<Vec<String>>,
+
+    /// ',' separated list of directories (all FASTA files in each directory will be indexed,
+    /// but not recursively).
+    #[arg(short = 'd', long, value_delimiter = ',', required = true)]
+    pub ref_dirs: Option<Vec<String>>,
+
+    /// length of k-mer to use
+    #[arg(short, long)]
+    pub klen: usize,
+
+    /// length of minimizer to use
+    #[arg(short, long)]
+    pub mlen: usize,
+
+    /// number of threads to use
+    #[arg(short, long)]
+    pub threads: usize,
+
+    /// output file stem
+    #[arg(short, long)]
+    pub output: PathBuf,
+
+    /// retain the reduced format GFA files produced by cuttlefish that
+    /// describe the reference cDBG (the default is to remove these).
+    #[arg(long)]
+    pub keep_intermediate_dbg: bool,
+
+    /// working directory where temporary files should be placed.
+    #[arg(short = 'w', long, default_value_os_t = PathBuf::from("."))]
+    pub work_dir: PathBuf,
+
+    /// overwite an existing index if the output path is the same.
+    #[arg(long)]
+    pub overwrite: bool,
+
+    /// skip the construction of the equivalence class lookup table
+    /// when building the index (not recommended).
+    #[arg(long)]
+    pub no_ec_table: bool,
+
+    /// path to (optional) decoy sequence used to insert poison
+    /// k-mer information into the index.
+    #[arg(long)]
+    pub decoy_paths: Option<Vec<PathBuf>>,
 }
 
 #[derive(Args, Clone, Debug)]
@@ -181,7 +245,22 @@ pub(crate) struct MapBulkOpts {
 }
 
 impl AsArgv for MapSCOpts {
-    fn as_argv(&self) -> Vec<CString> {
+    fn as_argv(&self) -> Result<Vec<CString>> {
+        // first check if the relevant index files exist
+        let mut idx_suffixes: Vec<String> = vec!["sshash".into(), "ctab".into(), "refinfo".into()];
+
+        if !self.ignore_ambig_hits {
+            idx_suffixes.push("ectab".into());
+        }
+
+        let idx_path = PathBuf::from_str(&self.index)?;
+        for s in idx_suffixes {
+            let req_file = idx_path.with_extension(s);
+            if !req_file.exists() {
+                bail!("To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!", &self.index, req_file.display());
+            }
+        }
+
         let r1_string = self.read1.join(",");
         let r2_string = self.read2.join(",");
 
@@ -228,12 +307,26 @@ impl AsArgv for MapSCOpts {
         args.push(CString::new("--max-read-occ").unwrap());
         args.push(CString::new(self.max_read_occ.to_string()).unwrap());
 
-        args
+        Ok(args)
     }
 }
 
 impl AsArgv for MapBulkOpts {
-    fn as_argv(&self) -> Vec<CString> {
+    fn as_argv(&self) -> Result<Vec<CString>> {
+        let mut idx_suffixes: Vec<String> = vec!["sshash".into(), "ctab".into(), "refinfo".into()];
+
+        if !self.ignore_ambig_hits {
+            idx_suffixes.push("ectab".into());
+        }
+
+        let idx_path = PathBuf::from_str(&self.index)?;
+        for s in idx_suffixes {
+            let req_file = idx_path.with_extension(s);
+            if !req_file.exists() {
+                bail!("To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!", &self.index, req_file.display());
+            }
+        }
+
         let mut args: Vec<CString> = vec![
             CString::new("bulk_ref_mapper").unwrap(),
             CString::new("-i").unwrap(),
@@ -284,6 +377,6 @@ impl AsArgv for MapBulkOpts {
         args.push(CString::new("--max-read-occ").unwrap());
         args.push(CString::new(self.max_read_occ.to_string()).unwrap());
 
-        args
+        Ok(args)
     }
 }
