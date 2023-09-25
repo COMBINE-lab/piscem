@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use clap::{ArgGroup, Args};
 use std::ffi::CString;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 trait DefaultMappingParams {
@@ -253,11 +253,13 @@ impl AsArgv for MapSCOpts {
             idx_suffixes.push("ectab".into());
         }
 
-        let idx_path = PathBuf::from_str(&self.index)?;
-        for s in idx_suffixes {
-            let req_file = idx_path.with_extension(s);
-            if !req_file.exists() {
-                bail!("To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!", &self.index, req_file.display());
+        {
+            let idx_path = get_index_path(&self.index)?;
+            for s in idx_suffixes {
+                let req_file = idx_path.with_extension(s);
+                if !req_file.exists() {
+                    bail!("To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!", &self.index, req_file.display());
+                }
             }
         }
 
@@ -311,6 +313,21 @@ impl AsArgv for MapSCOpts {
     }
 }
 
+fn get_index_path(base: &str) -> Result<PathBuf> {
+    if Path::new(base).exists() {
+        bail!(
+            concat!("The path {} was provided as the base path for the index, but this corresponds ",
+                    "to a specific existing file. The provided path should be the file stem (e.g. without the extension)."),
+            base);
+    }
+
+    if let Some(_ext) = Path::new(base).extension() {
+        Ok(PathBuf::from_str(&format!("{}.dummy", base))?)
+    } else {
+        Ok(PathBuf::from_str(base)?)
+    }
+}
+
 impl AsArgv for MapBulkOpts {
     fn as_argv(&self) -> Result<Vec<CString>> {
         let mut idx_suffixes: Vec<String> = vec!["sshash".into(), "ctab".into(), "refinfo".into()];
@@ -319,11 +336,13 @@ impl AsArgv for MapBulkOpts {
             idx_suffixes.push("ectab".into());
         }
 
-        let idx_path = PathBuf::from_str(&self.index)?;
-        for s in idx_suffixes {
-            let req_file = idx_path.with_extension(s);
-            if !req_file.exists() {
-                bail!("To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!", &self.index, req_file.display());
+        {
+            let idx_path = get_index_path(&self.index)?;
+            for s in idx_suffixes {
+                let req_file = idx_path.with_extension(s);
+                if !req_file.exists() {
+                    bail!("To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!", &self.index, req_file.display());
+                }
             }
         }
 
