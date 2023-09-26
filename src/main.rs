@@ -1,8 +1,8 @@
 use std::ffi::CString;
+use std::ffi::{OsStr, OsString};
 use std::io;
 use std::os::raw::{c_char, c_int};
 use std::path::PathBuf;
-use std::ffi::{OsStr, OsString};
 
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
@@ -54,7 +54,6 @@ enum Commands {
     #[command(arg_required_else_help = true)]
     MapBulk(MapBulkOpts),
 }
-
 
 // from: https://stackoverflow.com/questions/74322541/how-to-append-to-pathbuf
 fn append_to_path(p: impl Into<OsString>, s: impl AsRef<OsStr>) -> PathBuf {
