@@ -2,6 +2,7 @@ use std::ffi::CString;
 use std::io;
 use std::os::raw::{c_char, c_int};
 use std::path::PathBuf;
+use std::ffi::{OsStr, OsString};
 
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
@@ -52,6 +53,14 @@ enum Commands {
     /// map reads for bulk processing
     #[command(arg_required_else_help = true)]
     MapBulk(MapBulkOpts),
+}
+
+
+// from: https://stackoverflow.com/questions/74322541/how-to-append-to-pathbuf
+fn append_to_path(p: impl Into<OsString>, s: impl AsRef<OsStr>) -> PathBuf {
+    let mut p = p.into();
+    p.push(s);
+    p.into()
 }
 
 fn main() -> Result<(), anyhow::Error> {
@@ -133,9 +142,9 @@ fn main() -> Result<(), anyhow::Error> {
 
             let cf_out = PathBuf::from(output.as_path().to_string_lossy().into_owned() + "_cfish");
             let cf_base_path = cf_out.as_path();
-            let seg_file = cf_base_path.with_extension("cf_seg");
-            let seq_file = cf_base_path.with_extension("cf_seq");
-            let struct_file = cf_base_path.with_extension("json");
+            let seg_file = append_to_path(cf_base_path, ".cf_seg");
+            let seq_file = append_to_path(cf_base_path, ".cf_seq");
+            let struct_file = append_to_path(cf_base_path, ".json");
             let mut build_ret;
 
             if overwrite {
