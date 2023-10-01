@@ -4,6 +4,7 @@ use std::io;
 use std::os::raw::{c_char, c_int};
 use std::path::PathBuf;
 
+use prepare_fasta;
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
 use tracing::{error, info, warn, Level};
@@ -173,6 +174,13 @@ fn main() -> Result<(), anyhow::Error> {
 
             if let Some(seqs) = ref_seqs {
                 if !seqs.is_empty() {
+                    let out_stem = PathBuf::from(output.as_path().to_string_lossy().into_owned() + ".sigs");
+                    let configs = prepare_fasta::RecordParseConfig{
+                            input: seqs.clone(),
+                            output_stem: out_stem,
+                            polya_clip_length: None
+                        };
+                    prepare_fasta::parse_records(configs)?;
                     args.push(CString::new("--seq").unwrap());
                     let reflist = seqs.join(",");
                     args.push(CString::new(reflist.as_str()).unwrap());
