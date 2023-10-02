@@ -180,7 +180,9 @@ fn main() -> Result<(), anyhow::Error> {
                             output_stem: out_stem,
                             polya_clip_length: None
                         };
+                    info!("Computing and recording reference signatures...");
                     prepare_fasta::parse_records(configs)?;
+                    info!("done.");
                     args.push(CString::new("--seq").unwrap());
                     let reflist = seqs.join(",");
                     args.push(CString::new(reflist.as_str()).unwrap());
