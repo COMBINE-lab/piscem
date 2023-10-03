@@ -23,6 +23,8 @@ jobs:
           platform: x64
           version: 11
       - uses: actions/checkout@master
+          with:
+            submodules: recursive
       - name: Compile and release
         uses: rust-build/rust-build.action@v1.3.2
         env:
@@ -31,6 +33,7 @@ jobs:
           RUSTTARGET: ${{ matrix.target }}
           ARCHIVE_TYPES: ${{ matrix.archive }}
           TOOLCHAIN_VERSION: 1.72.1
+
   macos-arm-release:
     name: release mac os arm release
     runs-on: macos-12
