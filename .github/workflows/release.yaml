@@ -22,7 +22,8 @@ jobs:
         with:
           platform: x64
           version: 11
-      - uses: actions/checkout@master
+      - name: Checkout
+        uses: actions/checkout@master
           with:
             submodules: recursive
       - name: Compile and release
