@@ -20,7 +20,6 @@ jobs:
       - name: Set up GCC
         uses: egor-tensin/setup-gcc@v1
         with:
-          version: latest
           platform: x64
           version: 11
       - uses: actions/checkout@master
