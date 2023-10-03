@@ -24,8 +24,8 @@ jobs:
           version: 11
       - name: Checkout
         uses: actions/checkout@master
-          with:
-            submodules: recursive
+        with:
+          submodules: recursive
       - name: Compile and release
         uses: rust-build/rust-build.action@v1.3.2
         env:
