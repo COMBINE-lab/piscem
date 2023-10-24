@@ -85,9 +85,9 @@ pub(crate) struct BuildOpts {
     #[arg(long)]
     pub no_ec_table: bool,
 
-    /// path to (optional) decoy sequence used to insert poison
+    /// path to (optional) ',' sparated list of decoy sequences used to insert poison
     /// k-mer information into the index.
-    #[arg(long)]
+    #[arg(long, value_delimiter = ',')]
     pub decoy_paths: Option<Vec<PathBuf>>,
 }
 
@@ -143,7 +143,6 @@ pub(crate) struct MapSCOpts {
     #[arg(
         long,
         short,
-        requires = "check_ambig_hits",
         default_value_t = DefaultParams::MAX_EC_CARD,
         conflicts_with = "ignore_ambig_hits",
         help_heading = "Advanced options"
