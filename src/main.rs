@@ -96,6 +96,7 @@ fn main() -> Result<(), anyhow::Error> {
             overwrite,
             no_ec_table,
             decoy_paths,
+            seed,
         }) => {
             info!("starting piscem build");
             if threads == 0 {
@@ -311,6 +312,9 @@ fn main() -> Result<(), anyhow::Error> {
 
             args.push(CString::new("-t").unwrap());
             args.push(CString::new(threads.to_string()).unwrap());
+
+            args.push(CString::new("--seed").unwrap());
+            args.push(CString::new(seed.to_string()).unwrap());
 
             if quiet {
                 args.push(CString::new("--quiet").unwrap());

@@ -89,6 +89,12 @@ pub(crate) struct BuildOpts {
     /// k-mer information into the index.
     #[arg(long, value_delimiter = ',')]
     pub decoy_paths: Option<Vec<PathBuf>>,
+
+
+    /// index construction seed (seed value passed to SSHash index construction; useful if empty
+    /// buckets occur).
+    #[arg(long = "seed", default_value_t = 1)]
+    pub seed: u64,
 }
 
 #[derive(Args, Clone, Debug)]
