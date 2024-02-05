@@ -48,4 +48,4 @@ pr-run-mode = "plan"
 # split-debuginfo = "packed"
 
 [workspace.metadata.dist.github-custom-runners]
-aarch64-apple-darwin = "macos-14"
+aarch64-apple-darwin = "macos-13-arm64"
