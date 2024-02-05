@@ -48,4 +48,8 @@ pr-run-mode = "plan"
 # split-debuginfo = "packed"
 
 [workspace.metadata.dist.github-custom-runners]
-aarch64-apple-darwin = "macos-13-xlarge"
+aarch64-apple-darwin = "macos-14"
+
+[workspace.metadata.dist.dependencies.homebrew]
+autoconf = { version="2.72", stage = ["build", "run"], targets = ["aarch64-apple-darwin"] }
+automake = { version="1.16.5", stage = ["build", "run"], targets = ["aarch64-apple-darwin"] }
