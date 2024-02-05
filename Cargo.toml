@@ -46,3 +46,6 @@ pr-run-mode = "plan"
 ## and would be of limited utility anyway.
 # debug = true
 # split-debuginfo = "packed"
+
+[workspace.metadata.dist.github-custom-runners]
+aarch64-apple-darwin = "macos-14"
