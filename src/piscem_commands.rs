@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use clap::{ArgGroup, Args};
 use std::ffi::CString;
 use std::path::{Path, PathBuf};
@@ -30,6 +30,19 @@ pub trait AsArgv {
     fn as_argv(&self) -> Result<Vec<CString>>;
 }
 
+fn klen_is_good(s: &str) -> Result<usize> {
+    let k: usize = s
+        .parse()
+        .map_err(|_| anyhow!("`{s}` can't be parsed as a number"))?;
+    if k > 31 {
+        bail!("klen = {k} must be <= 31");
+    } else if (k & 1) == 0 {
+        bail!("klen = {k} must be odd");
+    } else {
+        Ok(k)
+    }
+}
+
 #[derive(Args, Clone, Debug)]
 #[command(arg_required_else_help = true)]
 #[command(group(
@@ -39,28 +52,33 @@ pub trait AsArgv {
 ))]
 pub(crate) struct BuildOpts {
     /// ',' separated list of reference FASTA files
-    #[arg(short = 's', long, value_delimiter = ',', required = true)]
+    #[arg(short = 's', long, help_heading = "Input", value_delimiter = ',')]
     pub ref_seqs: Option<Vec<String>>,
 
     /// ',' separated list of files (each listing input FASTA files)
-    #[arg(short = 'l', long, value_delimiter = ',', required = true)]
+    #[arg(short = 'l', long, help_heading = "Input", value_delimiter = ',')]
     pub ref_lists: Option<Vec<String>>,
 
     /// ',' separated list of directories (all FASTA files in each directory will be indexed,
     /// but not recursively).
-    #[arg(short = 'd', long, value_delimiter = ',', required = true)]
+    #[arg(short = 'd', long, help_heading = "Input", value_delimiter = ',')]
     pub ref_dirs: Option<Vec<String>>,
 
-    /// length of k-mer to use
-    #[arg(short, long)]
+    /// length of k-mer to use, must be <= 31 and odd
+    #[arg(short, long, help_heading = "Index Construction Parameters", default_value_t = 31, value_parser = klen_is_good)]
     pub klen: usize,
 
-    /// length of minimizer to use
-    #[arg(short, long)]
+    /// length of minimizer to use; must be < `klen`
+    #[arg(
+        short,
+        long,
+        help_heading = "Index Construction Parameters",
+        default_value_t = 19
+    )]
     pub mlen: usize,
 
     /// number of threads to use
-    #[arg(short, long)]
+    #[arg(short, long, help_heading = "Index Construction Parameters")]
     pub threads: usize,
 
     /// output file stem
@@ -69,20 +87,20 @@ pub(crate) struct BuildOpts {
 
     /// retain the reduced format GFA files produced by cuttlefish that
     /// describe the reference cDBG (the default is to remove these).
-    #[arg(long)]
+    #[arg(long, help_heading = "Indexing Details")]
     pub keep_intermediate_dbg: bool,
 
     /// working directory where temporary files should be placed.
-    #[arg(short = 'w', long, default_value_os_t = PathBuf::from("."))]
+    #[arg(short = 'w', long, help_heading = "Indexing Details", default_value_os_t = PathBuf::from("./workdir.noindex"))]
     pub work_dir: PathBuf,
 
     /// overwite an existing index if the output path is the same.
-    #[arg(long)]
+    #[arg(long, help_heading = "Indexing Details")]
     pub overwrite: bool,
 
     /// skip the construction of the equivalence class lookup table
     /// when building the index (not recommended).
-    #[arg(long)]
+    #[arg(long, help_heading = "Index Construction Parameters")]
     pub no_ec_table: bool,
 
     /// path to (optional) ',' sparated list of decoy sequences used to insert poison
@@ -90,17 +108,20 @@ pub(crate) struct BuildOpts {
     #[arg(long, value_delimiter = ',')]
     pub decoy_paths: Option<Vec<PathBuf>>,
 
-
     /// index construction seed (seed value passed to SSHash index construction; useful if empty
     /// buckets occur).
-    #[arg(long = "seed", default_value_t = 1)]
+    #[arg(
+        long = "seed",
+        help_heading = "Index Construction Parameters",
+        default_value_t = 1
+    )]
     pub seed: u64,
 }
 
 #[derive(Args, Clone, Debug)]
 pub(crate) struct MapSCOpts {
     /// input index prefix
-    #[arg(short, long)]
+    #[arg(short, long, help_heading = "Input")]
     pub index: String,
 
     /// geometry of barcode, umi and read
@@ -108,11 +129,23 @@ pub(crate) struct MapSCOpts {
     pub geometry: String,
 
     /// path to list of read 1 files
-    #[arg(short = '1', long, value_delimiter = ',', required = true)]
+    #[arg(
+        short = '1',
+        long,
+        help_heading = "Input",
+        value_delimiter = ',',
+        required = true
+    )]
     pub read1: Vec<String>,
 
     /// path to list of read 2 files
-    #[arg(short = '2', long, value_delimiter = ',', required = true)]
+    #[arg(
+        short = '2',
+        long,
+        help_heading = "Input",
+        value_delimiter = ',',
+        required = true
+    )]
     pub read2: Vec<String>,
 
     /// number of threads to use
@@ -178,19 +211,31 @@ pub(crate) struct MapSCOpts {
 ))]
 pub(crate) struct MapBulkOpts {
     /// input index prefix
-    #[arg(short, long)]
+    #[arg(short, long, help_heading = "Input")]
     pub index: String,
 
     /// path to list of read 1 files
-    #[arg(short = '1', long, value_delimiter = ',', requires = "read2")]
+    #[arg(
+        short = '1',
+        long,
+        help_heading = "Input",
+        value_delimiter = ',',
+        requires = "read2"
+    )]
     pub read1: Option<Vec<String>>,
 
     /// path to list of read 2 files
-    #[arg(short = '2', long, value_delimiter = ',', requires = "read1")]
+    #[arg(
+        short = '2',
+        long,
+        help_heading = "Input",
+        value_delimiter = ',',
+        requires = "read1"
+    )]
     pub read2: Option<Vec<String>>,
 
     /// path to list of read unpaired read files
-    #[arg(short = 'r', long, value_delimiter = ',', conflicts_with_all = ["read1", "read2"])]
+    #[arg(short = 'r', long, help_heading = "Input", value_delimiter = ',', conflicts_with_all = ["read1", "read2"])]
     pub reads: Option<Vec<String>>,
 
     /// number of threads to use
