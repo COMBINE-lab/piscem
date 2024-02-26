@@ -1,6 +1,6 @@
 [package]
 name = "piscem"
-version = "0.7.3"
+version = "0.8.0"
 edition = "2021"
 build = "build.rs"
 repository = "https://github.com/COMBINE-lab/piscem"
