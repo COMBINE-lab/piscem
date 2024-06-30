@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  release:
+    name: release ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            archive: tar.gz tar.xz
+          - target: x86_64-apple-darwin
+            archive: tar.gz
+    steps:
+      - name: Set up GCC
+        uses: egor-tensin/setup-gcc@v1
+        with:
+          platform: x64
+          version: 11
+      - name: Checkout
+        uses: actions/checkout@master
+        with:
+          submodules: recursive
+      - name: Compile and release
+        uses: rust-build/rust-build.action@v1.3.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          RUSTTARGET: ${{ matrix.target }}
+          ARCHIVE_TYPES: ${{ matrix.archive }}
+          TOOLCHAIN_VERSION: 1.72.1
+
+  macos-arm-release:
+    name: release mac os arm release
+    runs-on: macos-13-xl
+    steps:
+      - uses: actions/checkout@master
+        with:
+          submodules: recursive
+      - name: check toolchain
+        run: rustup default
+      - name: Build
+        run: |
+          rustup toolchain install stable-aarch64-apple-darwin
+          rustup target add aarch64-apple-darwin
+          CC=clang CXX=clang++ cargo build --release --target aarch64-apple-darwin
+      - name: tar
+        run: tar --directory=target/aarch64-apple-darwin/release -cf archive.tar.gz piscem
+      - name: upload
+        run: |
+          id=$(gh api -H "Accept: application/vnd.github+json" /repos/COMBINE-lab/piscem/releases/tags/${{ github.ref_name }} --jq .id)
+          curl --fail-with-body -sS  -X POST --data-binary @"archive.tar.gz" -H 'Content-Type: application/octet-stream' -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "https://uploads.github.com/repos/COMBINE-lab/piscem/releases/$id/assets?name=piscem_${{ github.ref_name }}_aarch64-apple-darwin.tar.gz"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
