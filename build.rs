@@ -67,6 +67,22 @@ fn main() {
         dst_piscem_cpp.join("lib").display()
     );
 
+    if is_conda_build {
+        // For some reason, if we are using
+        // conda and we are building for the
+        // linux target; things get put in the
+        // lib64 directory rather than lib...
+        // So, we add that here
+        println!(
+            "cargo:rustc-link-search=native={}",
+            dst_cf.join("lib64").display()
+        );
+        println!(
+            "cargo:rustc-link-search=native={}",
+            dst_piscem_cpp.join("lib64").display()
+        );
+    }
+
     println!("cargo:rustc-link-lib=static=kmc_core");
     //println!("cargo:rustc-link-lib=static=pesc_static");
     //println!("cargo:rustc-link-lib=static=build_static");
@@ -79,12 +95,4 @@ fn main() {
 
     #[cfg(target_os = "macos")]
     println!("cargo:rustc-link-lib=dylib=c++");
-
-    if is_conda_build {
-        // if we are on OSX, building on conda
-        // the filesystem support is borked and
-        // we have to jump through some hoops.
-        // #[cfg(target_os = "macos")]
-        // println!("cargo:rustc-link-lib=static=c++fs");
-    }
 }
