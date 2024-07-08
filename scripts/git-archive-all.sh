@@ -112,7 +112,7 @@ SEPARATE=0
 VERBOSE=0
 
 TARCMD=`command -v gtar || command -v gnutar || command -v tar`
-REALPATHCMD=`command -v grealpath || command -v realpah`
+REALPATHCMD=`command -v grealpath || command -v realpath`
 FORMAT=tar
 FORMAT_=tar # Format in processing
 PREFIX=
