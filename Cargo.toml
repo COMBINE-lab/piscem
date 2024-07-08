@@ -49,9 +49,15 @@ install-updater = true
 # debug = true
 # split-debuginfo = "packed"
 
+[[workspace.metadata.dist.extra-artifacts]]
+artifacts = ["source_recursive.tar.gz"]
+build = ["bash", "scripts/git-archive-all.sh", "--format", "tar.gz", "--prefix", "piscem/", "source_recursive.tar.gz"]
+
 [workspace.metadata.dist.github-custom-runners]
 aarch64-apple-darwin = "macos-14"
 
 [workspace.metadata.dist.dependencies.homebrew]
 autoconf = { version="2.72", stage = ["build", "run"], targets = ["aarch64-apple-darwin"] }
 automake = { version="1.16.5", stage = ["build", "run"], targets = ["aarch64-apple-darwin"] }
+coreutils = { stage = ["build"] }
+gnu-tar = { stage = ["build"] }
