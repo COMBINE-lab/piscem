@@ -29,7 +29,7 @@ inherits = "release"
 # Config for 'cargo dist'
 [workspace.metadata.dist]
 # The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.17.0"
+cargo-dist-version = "0.18.0"
 # The installers to generate for each app
 installers = ["shell"]
 # Target platforms to build apps for (Rust target-triple syntax)
@@ -42,6 +42,8 @@ ci = "github"
 pr-run-mode = "plan"
 # Whether to install an updater program
 install-updater = true
+# Generate and dist a source tarball
+source-tarball = false
 ## since this is cross-language and 
 ## we are not including C++ debug 
 ## symbols, this currently doesn't work 
@@ -50,8 +52,8 @@ install-updater = true
 # split-debuginfo = "packed"
 
 [[workspace.metadata.dist.extra-artifacts]]
-artifacts = ["source_recursive.tar.gz"]
-build = ["bash", "scripts/git-archive-all.sh", "--format", "tar.gz", "--prefix", "piscem/", "source_recursive.tar.gz"]
+artifacts = ["source.tar.gz", "source.tar.gz.sha256"]
+build = ["bash", "scripts/git-archive-all.sh", "--format", "tar.gz", "--prefix", "piscem/", "source.tar.gz"]
 
 [workspace.metadata.dist.github-custom-runners]
 aarch64-apple-darwin = "macos-14"
