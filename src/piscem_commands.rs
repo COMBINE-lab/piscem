@@ -124,6 +124,10 @@ pub(crate) struct MapSCOpts {
     #[arg(short, long, help_heading = "Input")]
     pub index: String,
 
+    /// list available geometries supported by the underlying `pesc-sc` mapper
+    // #[arg(long, help_heading = "Advanced")]
+    // pub list_geometries: bool,
+
     /// geometry of barcode, umi and read
     #[arg(short, long)]
     pub geometry: String,
@@ -331,6 +335,10 @@ impl AsArgv for MapSCOpts {
             CString::new("-o").unwrap(),
             CString::new(self.output.as_str()).unwrap(),
         ];
+
+        /*if self.list_geometries {
+            args.push(CString::new("--list-geometries").unwrap());
+        }*/
 
         if self.ignore_ambig_hits {
             args.push(CString::new("--ignore-ambig-hits").unwrap());
