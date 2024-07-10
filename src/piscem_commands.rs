@@ -132,7 +132,7 @@ pub(crate) struct MapSCOpts {
     #[arg(short, long)]
     pub geometry: String,
 
-    /// path to list of read 1 files
+    /// path to a ',' separated list of read 1 files
     #[arg(
         short = '1',
         long,
@@ -142,7 +142,7 @@ pub(crate) struct MapSCOpts {
     )]
     pub read1: Vec<String>,
 
-    /// path to list of read 2 files
+    /// path to a ',' separated list of read 2 files
     #[arg(
         short = '2',
         long,
@@ -158,7 +158,7 @@ pub(crate) struct MapSCOpts {
 
     /// path to output directory
     #[arg(short, long)]
-    pub output: String,
+    pub output: PathBuf,
 
     /// do not consider poison k-mers, even if the underlying index contains them.
     /// In this case, the mapping results will be identical to those obtained as if
@@ -218,7 +218,7 @@ pub(crate) struct MapBulkOpts {
     #[arg(short, long, help_heading = "Input")]
     pub index: String,
 
-    /// path to list of read 1 files
+    /// path to a comma-separated list of read 1 files
     #[arg(
         short = '1',
         long,
@@ -228,7 +228,7 @@ pub(crate) struct MapBulkOpts {
     )]
     pub read1: Option<Vec<String>>,
 
-    /// path to list of read 2 files
+    /// path to a ',' separated list of read 2 files
     #[arg(
         short = '2',
         long,
@@ -238,7 +238,7 @@ pub(crate) struct MapBulkOpts {
     )]
     pub read2: Option<Vec<String>>,
 
-    /// path to list of read unpaired read files
+    /// path to a ',' separated list of read unpaired read files
     #[arg(short = 'r', long, help_heading = "Input", value_delimiter = ',', conflicts_with_all = ["read1", "read2"])]
     pub reads: Option<Vec<String>>,
 
@@ -248,7 +248,7 @@ pub(crate) struct MapBulkOpts {
 
     /// path to output directory
     #[arg(short, long)]
-    pub output: String,
+    pub output: PathBuf,
 
     /// do not consider poison k-mers, even if the underlying index contains them.
     /// In this case, the mapping results will be identical to those obtained as if
@@ -333,7 +333,16 @@ impl AsArgv for MapSCOpts {
             CString::new("-t").unwrap(),
             CString::new(self.threads.to_string()).unwrap(),
             CString::new("-o").unwrap(),
-            CString::new(self.output.as_str()).unwrap(),
+            #[cfg(not(target_os = "windows"))]
+            CString::new(std::os::unix::ffi::OsStrExt::as_bytes(
+                <PathBuf as Clone>::clone(&self.output)
+                    .into_os_string()
+                    .as_os_str(),
+            ))
+            .unwrap(),
+            // NOTE: Windows is completely untested
+            #[cfg(target_os = "windows")]
+            CString::new(self.output.into_os_string().to_str()?).unwrap(),
         ];
 
         /*if self.list_geometries {
@@ -411,7 +420,16 @@ impl AsArgv for MapBulkOpts {
             CString::new("-t").unwrap(),
             CString::new(self.threads.to_string()).unwrap(),
             CString::new("-o").unwrap(),
-            CString::new(self.output.as_str()).unwrap(),
+            #[cfg(not(target_os = "windows"))]
+            CString::new(std::os::unix::ffi::OsStrExt::as_bytes(
+                <PathBuf as Clone>::clone(&self.output)
+                    .into_os_string()
+                    .as_os_str(),
+            ))
+            .unwrap(),
+            // NOTE: Windows is completely untested
+            #[cfg(target_os = "windows")]
+            CString::new(self.output.into_os_string().to_str()?).unwrap(),
         ];
 
         if let Some(ref unpaired_reads) = &self.reads {

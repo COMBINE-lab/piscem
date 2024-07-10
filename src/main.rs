@@ -406,7 +406,7 @@ fn main() -> Result<(), anyhow::Error> {
                 // about the references being indexed.
             }
 
-            info!("piscem build finished");
+            info!("piscem build finished.");
         }
 
         Commands::MapSC(sc_opts) => {
