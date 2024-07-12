@@ -2,6 +2,13 @@
 
 `piscem` is a rust wrapper for a next-generation index + mapper tool (still currently written in C++17).
 
+Notes
+=====
+
+If you are using the pre-compiled binary from `bioconda` on an x86 OSX system, you may encounter an illegal instruction error.  This is because the `bioconda` builders
+have newer CPUs than some older x86 Macs.  For the time being, you should be able to grab the pre-compiled x86 OSX binaries from the [releases page](https://github.com/COMBINE-lab/piscem/releases)
+while we figure out the best solution "upstream" with `bioconda` x86 OSX builds (i.e. how to remove this instruction while not hurting performance on CPUs that support it).
+
 Building
 ========
 
