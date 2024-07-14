@@ -8,7 +8,14 @@ fn main() {
     let nopie_build = env::var("NOPIE");
     let nobmi2_var = env::var("NO_BMI2");
 
-    let mut is_conda_build = false;
+    let is_conda_build = match conda_build {
+        Ok(val) => match val.to_uppercase().as_str() {
+            "TRUE" | "1" | "YES" => true,
+            "FALSE" | "0" | "NO" => false,
+            _ => true,
+        },
+        Err(_e) => false,
+    };
 
     println!("cargo:rerun-if-changed=cuttlefish/CMakeLists.txt");
     println!("cargo:rerun-if-changed=piscem-cpp/CMakeLists.txt");
@@ -27,11 +34,10 @@ fn main() {
         (*cfg_cf).define("CMAKE_CXX_COMPILER", cxx_var);
     }
 
-    if let Ok(_conda_build) = conda_build {
+    if is_conda_build {
         (*cfg_cf).define("CONDA_BUILD", "TRUE");
         (*cfg_cf).define("CMAKE_OSX_DEPLOYMENT_TARGET", "10.15");
         (*cfg_cf).define("MACOSX_SDK_VERSION", "10.15");
-        is_conda_build = true;
     }
 
     if let Ok(nobmi2) = nobmi2_var {
@@ -67,21 +73,19 @@ fn main() {
         dst_piscem_cpp.join("lib").display()
     );
 
-    if is_conda_build {
-        // For some reason, if we are using
-        // conda and we are building for the
-        // linux target; things get put in the
-        // lib64 directory rather than lib...
-        // So, we add that here
-        println!(
-            "cargo:rustc-link-search=native={}",
-            dst_cf.join("lib64").display()
-        );
-        println!(
-            "cargo:rustc-link-search=native={}",
-            dst_piscem_cpp.join("lib64").display()
-        );
-    }
+    // For some reason, if we are using
+    // *some* linux distros (and on conda) and are
+    // building for the linux target;
+    // things get put in the lib64 directory
+    // rather than lib... So, we add that here
+    println!(
+        "cargo:rustc-link-search=native={}",
+        dst_cf.join("lib64").display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}",
+        dst_piscem_cpp.join("lib64").display()
+    );
 
     println!("cargo:rustc-link-lib=static=kmc_core");
     //println!("cargo:rustc-link-lib=static=pesc_static");
