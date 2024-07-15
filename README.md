@@ -5,9 +5,9 @@
 Notes
 =====
 
-If you are using the pre-compiled binary from `bioconda` on an x86 OSX system, you may encounter an illegal instruction error.  This is because the `bioconda` builders
-have newer CPUs than some older x86 Macs.  For the time being, you should be able to grab the pre-compiled x86 OSX binaries from the [releases page](https://github.com/COMBINE-lab/piscem/releases)
-while we figure out the best solution "upstream" with `bioconda` x86 OSX builds (i.e. how to remove this instruction while not hurting performance on CPUs that support it).
+If you are primarily interested in simply *using* `piscem`, you can obtain pre-compiled binaries from the GitHub [releases](https://github.com/COMBINE-lab/piscem/releases/tag/v0.10.3) page
+for linux x86-64, OSX x86-64, and OSX ARM. Likewise, `piscem` can be installed using [bioconda](https://bioconda.github.io/recipes/piscem/README.html).  The instructions below are 
+primarily for those who need to *build* `piscem` from source.
 
 Building
 ========
