@@ -5,9 +5,18 @@
 Notes
 =====
 
-If you are primarily interested in simply *using* `piscem`, you can obtain pre-compiled binaries from the GitHub [releases](https://github.com/COMBINE-lab/piscem/releases/tag/v0.10.3) page
+ - If you are primarily interested in simply *using* `piscem`, you can obtain pre-compiled binaries from the GitHub [releases](https://github.com/COMBINE-lab/piscem/releases/tag/v0.10.3) page
 for linux x86-64, OSX x86-64, and OSX ARM. Likewise, `piscem` can be installed using [bioconda](https://bioconda.github.io/recipes/piscem/README.html).  The instructions below are 
 primarily for those who need to *build* `piscem` from source.
+
+ - **Please ensure that the user file handle limit is set to 2048**.  This may already be set (and should be fine already on OSX), but you can accomplish this by executing:
+
+```
+$ ulimit -n 2048
+```
+
+before running `piscem`.
+
 
 Building
 ========
