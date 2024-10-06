@@ -4,5 +4,5 @@
 	branch = develop
 [submodule "piscem-cpp"]
 	path = piscem-cpp
-	url = git@github.com:combine-lab/piscem-cpp.git
-	branch = dev-atac
+	url = https://github.com/COMBINE-lab/piscem-cpp.git
+	ranch = dev-atac
