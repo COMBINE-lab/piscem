@@ -93,6 +93,7 @@ fn main() {
     println!("cargo:rustc-link-lib=static=sshash_static");
     println!("cargo:rustc-link-lib=static=z");
     println!("cargo:rustc-link-lib=static=bz2");
+    println!("cargo:rustc-link-lib=static=radicl");
 
     #[cfg(target_os = "linux")]
     println!("cargo:rustc-link-lib=dylib=stdc++");
