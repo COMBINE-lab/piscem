@@ -55,7 +55,7 @@ enum Commands {
     #[command(arg_required_else_help = true)]
     MapBulk(MapBulkOpts),
 
-    /// map reads for bulk processing
+    /// map reads for scAtac processing
     #[command(arg_required_else_help = true)]
     MapSCAtac(MapSCAtacOpts),
 }

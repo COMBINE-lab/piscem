@@ -607,9 +607,9 @@ impl AsArgv for MapSCAtacOpts {
         // first check if the relevant index files exist
         let mut idx_suffixes: Vec<String> = vec!["sshash".into(), "ctab".into(), "refinfo".into()];
 
-        if !self.ignore_ambig_hits {
-            idx_suffixes.push("ectab".into());
-        }
+        // if !self.ignore_ambig_hits {
+        //     idx_suffixes.push("ectab".into());
+        // }
 
         {
             let idx_path = get_index_path(&self.index)?;
@@ -655,12 +655,12 @@ impl AsArgv for MapSCAtacOpts {
             args.push(CString::new("--list-geometries").unwrap());
         }*/
 
-        if self.ignore_ambig_hits {
-            args.push(CString::new("--ignore-ambig-hits").unwrap());
-        } else {
-            args.push(CString::new("--max-ec-card").unwrap());
-            args.push(CString::new(self.max_ec_card.to_string()).unwrap());
-        }
+        // if self.ignore_ambig_hits {
+        //     args.push(CString::new("--ignore-ambig-hits").unwrap());
+        // } else {
+        //     args.push(CString::new("--max-ec-card").unwrap());
+        //     args.push(CString::new(self.max_ec_card.to_string()).unwrap());
+        // }
 
         if self.no_poison {
             args.push(CString::new("--no-poison").unwrap());
@@ -697,14 +697,14 @@ impl AsArgv for MapSCAtacOpts {
         args.push(CString::new("--bin-overlap").unwrap());
         args.push(CString::new(self.bin_overlap.to_string()).unwrap());
 
-        args.push(CString::new("--max-hit-occ").unwrap());
-        args.push(CString::new(self.max_hit_occ.to_string()).unwrap());
+        // args.push(CString::new("--max-hit-occ").unwrap());
+        // args.push(CString::new(self.max_hit_occ.to_string()).unwrap());
 
-        args.push(CString::new("--max-hit-occ-recover").unwrap());
-        args.push(CString::new(self.max_hit_occ_recover.to_string()).unwrap());
+        // args.push(CString::new("--max-hit-occ-recover").unwrap());
+        // args.push(CString::new(self.max_hit_occ_recover.to_string()).unwrap());
 
-        args.push(CString::new("--max-read-occ").unwrap());
-        args.push(CString::new(self.max_read_occ.to_string()).unwrap());
+        // args.push(CString::new("--max-read-occ").unwrap());
+        // args.push(CString::new(self.max_read_occ.to_string()).unwrap());
 
         Ok(args)
     }
