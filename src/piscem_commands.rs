@@ -562,13 +562,13 @@ pub(crate) struct MapSCAtacOpts {
     #[arg(long, default_value_t = DefaultParams::BIN_SIZE)]
     pub bin_size: u32,
 
-    /// size of overlapping bin, default set to 300
-    #[arg(long)]
+    /// size for bin overlap, default set to 300
+    #[arg(long, default_value_t = DefaultParams::BIN_OVERLAP)]
     pub bin_overlap: u32,
 
-    /// apply Tn5 shift to mapped positions, default set to true
+    /// do not apply Tn5 shift to mapped positions
     #[arg(long)]
-    pub tn5_shift: bool,
+    pub no_tn5_shift: bool,
 
     /// Check if any mapping kmer exist for a mate, 
     /// if there exists mapping for the other read (default false)
@@ -643,7 +643,7 @@ impl AsArgv for MapSCAtacOpts {
         if let (Some(ref r1), Some(ref r2), Some(ref b)) = (&self.read1, &self.read2, &self.barcode) {
             let r1_string = r1.clone().join(",");
             let r2_string = r2.clone().join(",");
-            let b_string = r2.clone().join(",");
+            let b_string = b.clone().join(",");
             args.push(CString::new("-1").unwrap());
             args.push(CString::new(r1_string.as_str()).unwrap());
             args.push(CString::new("-2").unwrap());
@@ -684,19 +684,23 @@ impl AsArgv for MapSCAtacOpts {
         if self.kmers_orphans {
             args.push(CString::new("--kmers-orphans").unwrap());
         }
-        
+      
         args.push(CString::new("--thr").unwrap());
         args.push(CString::new(self.thr.to_string()).unwrap());
     
-        args.push(CString::new("--tn5-shift").unwrap());
-        args.push(CString::new(self.tn5_shift.to_string()).unwrap());
+
+        if self.no_tn5_shift {
+            args.push(CString::new("--tn5-shift").unwrap());
+            args.push(CString::new("false").unwrap());
+        }
+
     
         args.push(CString::new("--bin-size").unwrap());
         args.push(CString::new(self.bin_size.to_string()).unwrap());
-
+        
         args.push(CString::new("--bin-overlap").unwrap());
         args.push(CString::new(self.bin_overlap.to_string()).unwrap());
-
+    
         // args.push(CString::new("--max-hit-occ").unwrap());
         // args.push(CString::new(self.max_hit_occ.to_string()).unwrap());
 
