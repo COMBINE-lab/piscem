@@ -570,10 +570,11 @@ pub(crate) struct MapSCAtacOpts {
     #[arg(long)]
     pub no_tn5_shift: bool,
 
-    /// Check if any mapping kmer exist for a mate, 
-    /// if there exists mapping for the other read (default false)
+    /// Check if any mapping kmer exist for a mate which is not mapped, 
+    /// but there exists mapping for the other read.
+    /// If set to true and a mapping kmer exists, then the pair would not be mapped (default false)
     #[arg(long)]
-    pub kmers_orphans: bool,
+    pub check_kmer_orphan: bool,
 
     /// determines the maximum cardinality equivalence class
     /// (number of (txp, orientation status) pairs) to examine (cannot be used with
@@ -681,7 +682,7 @@ impl AsArgv for MapSCAtacOpts {
             args.push(CString::new("--sam-format").unwrap());
         }
 
-        if self.kmers_orphans {
+        if self.check_kmer_orphan {
             args.push(CString::new("--kmers-orphans").unwrap());
         }
       
