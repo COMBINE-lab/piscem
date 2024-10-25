@@ -554,6 +554,10 @@ pub(crate) struct MapSCAtacOpts {
     #[arg(long)]
     pub bed_format: bool,
 
+    /// use chromosomes as color
+    #[arg(long)]
+    pub use_chr: bool,
+
     /// threshold to be considered for pseudoalignment, default set to 0.7
     #[arg(long, default_value_t = DefaultParams::THRESHOLD)]
     pub thr: f32,
@@ -676,6 +680,10 @@ impl AsArgv for MapSCAtacOpts {
 
         if self.bed_format {
             args.push(CString::new("--bed-format").unwrap());
+        }
+
+        if self.use_chr {
+            args.push(CString::new("--use-chr").unwrap());
         }
 
         if self.sam_format {
