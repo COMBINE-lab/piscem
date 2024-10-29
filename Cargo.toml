@@ -1,21 +1,28 @@
 [package]
 name = "piscem"
-version = "0.10.3"
+version = "0.10.4"
 edition = "2021"
 build = "build.rs"
 repository = "https://github.com/COMBINE-lab/piscem"
 
 [build-dependencies]
-cmake = "0.1.50"
+cmake = "0.1.51"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 num_cpus = "1.16.0"
-anyhow = "1.0.86"
-clap = { version = "4.5.9", features = ["cargo", "derive", "env", "wrap_help"] }
+anyhow = "1.0.91"
+clap = { version = "4.5.20", features = [
+  "cargo",
+  "derive",
+  "env",
+  "wrap_help",
+] }
 tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.18", default-features = true, features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.18", default-features = true, features = [
+  "env-filter",
+] }
 prepare_fasta = "0.1.0"
 
 [profile.release]
@@ -33,7 +40,11 @@ cargo-dist-version = "0.18.0"
 # The installers to generate for each app
 installers = ["shell"]
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu"]
+targets = [
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+  "x86_64-unknown-linux-gnu",
+]
 # The archive format to use for non-windows builds (defaults .tar.xz)
 unix-archive = ".tar.gz"
 # CI backends to support
@@ -53,13 +64,31 @@ source-tarball = false
 
 [[workspace.metadata.dist.extra-artifacts]]
 artifacts = ["source.tar.gz", "source.tar.gz.sha256"]
-build = ["bash", "scripts/git-archive-all.sh", "--format", "tar.gz", "--prefix", "piscem/", "source.tar.gz"]
+build = [
+  "bash",
+  "scripts/git-archive-all.sh",
+  "--format",
+  "tar.gz",
+  "--prefix",
+  "piscem/",
+  "source.tar.gz",
+]
 
 [workspace.metadata.dist.github-custom-runners]
 aarch64-apple-darwin = "macos-14"
 
 [workspace.metadata.dist.dependencies.homebrew]
-autoconf = { version="2.72", stage = ["build", "run"], targets = ["aarch64-apple-darwin"] }
-automake = { version="1.16.5", stage = ["build", "run"], targets = ["aarch64-apple-darwin"] }
+autoconf = { version = "2.72", stage = [
+  "build",
+  "run",
+], targets = [
+  "aarch64-apple-darwin",
+] }
+automake = { version = "1.16.5", stage = [
+  "build",
+  "run",
+], targets = [
+  "aarch64-apple-darwin",
+] }
 coreutils = { stage = ["build"] }
 gnu-tar = { stage = ["build"] }
