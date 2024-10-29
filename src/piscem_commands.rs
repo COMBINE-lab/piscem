@@ -574,7 +574,7 @@ pub(crate) struct MapSCAtacOpts {
     #[arg(long)]
     pub no_tn5_shift: bool,
 
-    /// Check if any mapping kmer exist for a mate which is not mapped, 
+    /// Check if any mapping kmer exist for a mate which is not mapped,
     /// but there exists mapping for the other read.
     /// If set to true and a mapping kmer exists, then the pair would not be mapped (default false)
     #[arg(long)]
@@ -645,7 +645,8 @@ impl AsArgv for MapSCAtacOpts {
             CString::new(self.output.into_os_string().to_str()?).unwrap(),
         ];
 
-        if let (Some(ref r1), Some(ref r2), Some(ref b)) = (&self.read1, &self.read2, &self.barcode) {
+        if let (Some(ref r1), Some(ref r2), Some(ref b)) = (&self.read1, &self.read2, &self.barcode)
+        {
             let r1_string = r1.clone().join(",");
             let r2_string = r2.clone().join(",");
             let b_string = b.clone().join(",");
@@ -693,23 +694,21 @@ impl AsArgv for MapSCAtacOpts {
         if self.check_kmer_orphan {
             args.push(CString::new("--kmers-orphans").unwrap());
         }
-      
+
         args.push(CString::new("--thr").unwrap());
         args.push(CString::new(self.thr.to_string()).unwrap());
-    
 
         if self.no_tn5_shift {
             args.push(CString::new("--tn5-shift").unwrap());
             args.push(CString::new("false").unwrap());
         }
 
-    
         args.push(CString::new("--bin-size").unwrap());
         args.push(CString::new(self.bin_size.to_string()).unwrap());
-        
+
         args.push(CString::new("--bin-overlap").unwrap());
         args.push(CString::new(self.bin_overlap.to_string()).unwrap());
-    
+
         // args.push(CString::new("--max-hit-occ").unwrap());
         // args.push(CString::new(self.max_hit_occ.to_string()).unwrap());
 

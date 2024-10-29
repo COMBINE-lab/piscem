@@ -86,12 +86,36 @@ fn main() {
         "cargo:rustc-link-search=native={}",
         dst_piscem_cpp.join("lib64").display()
     );
+    let profile = std::env::var("PROFILE").unwrap();
+    match profile.as_str() {
+        "debug" => {
+            println!(
+                "cargo:rustc-link-search=native={}",
+                dst_piscem_cpp.join("Debug").join("lib64").display()
+            );
+            println!(
+                "cargo:rustc-link-search=native={}",
+                dst_piscem_cpp.join("Debug").join("lib").display()
+            );
+        }
+        "release" => {
+            println!(
+                "cargo:rustc-link-search=native={}",
+                dst_piscem_cpp.join("Release").join("lib64").display()
+            );
+            println!(
+                "cargo:rustc-link-search=native={}",
+                dst_piscem_cpp.join("Release").join("lib").display()
+            );
+        }
+        _ => (),
+    }
 
     println!("cargo:rustc-link-lib=static=kmc_core");
     //println!("cargo:rustc-link-lib=static=pesc_static");
     //println!("cargo:rustc-link-lib=static=build_static");
     println!("cargo:rustc-link-lib=static=sshash_static");
-    println!("cargo:rustc-link-lib=static=z");
+    println!("cargo:rustc-link-lib=static=zcf");
     println!("cargo:rustc-link-lib=static=bz2");
     println!("cargo:rustc-link-lib=static=radicl");
 
