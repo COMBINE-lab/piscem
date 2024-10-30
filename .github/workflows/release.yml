@@ -16,6 +16,8 @@
 name: Release
 permissions:
   "contents": "write"
+  "pull-requests": "write"
+  "repository-projects": "write"
 
 # This task will run whenever you push a git tag that looks like a version
 # like "1.0.0", "v0.1.0-prerelease.1", "my-app/0.1.0", "releases/v1.0.0", etc.
@@ -202,7 +204,6 @@ jobs:
             ${{ env.BUILD_MANIFEST_NAME }}
   # Determines if we should publish/announce
   host:
-    permissions: write-all
     needs:
       - plan
       - build-local-artifacts
