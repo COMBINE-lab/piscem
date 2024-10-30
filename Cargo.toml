@@ -36,7 +36,7 @@ inherits = "release"
 # Config for 'cargo dist'
 [workspace.metadata.dist]
 # The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.18.0"
+cargo-dist-version = "0.21.1"
 # The installers to generate for each app
 installers = ["shell"]
 # Target platforms to build apps for (Rust target-triple syntax)
@@ -49,12 +49,14 @@ targets = [
 unix-archive = ".tar.gz"
 # CI backends to support
 ci = "github"
-# Publish jobs to run in CI
+# Which actions to run on pull requests
 pr-run-mode = "plan"
 # Whether to install an updater program
 install-updater = true
 # Generate and dist a source tarball
 source-tarball = false
+# Path that installers should place binaries in
+install-path = "CARGO_HOME"
 ## since this is cross-language and 
 ## we are not including C++ debug 
 ## symbols, this currently doesn't work 
