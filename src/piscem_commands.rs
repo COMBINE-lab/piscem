@@ -508,6 +508,9 @@ pub(crate) struct MapSCAtacOpts {
     )]
     pub read2: Option<Vec<String>>,
 
+    #[arg(short = 'r', long, help_heading = "Input", value_delimiter = ',', conflicts_with_all = ["read1", "read2"])]
+    pub reads: Option<Vec<String>>,
+
     /// path to a ',' separated list of read 2 files
     #[arg(
         short = 'b',
@@ -645,18 +648,34 @@ impl AsArgv for MapSCAtacOpts {
             CString::new(self.output.into_os_string().to_str()?).unwrap(),
         ];
 
-        if let (Some(ref r1), Some(ref r2), Some(ref b)) = (&self.read1, &self.read2, &self.barcode)
-        {
+        // if let (Some(ref r1), Some(ref r2), Some(ref b)) = (&self.read1, &self.read2, &self.barcode)
+        // {
+        //     let r1_string = r1.clone().join(",");
+        //     let r2_string = r2.clone().join(",");
+        //     
+        //     args.push(CString::new("-1").unwrap());
+        //     args.push(CString::new(r1_string.as_str()).unwrap());
+        //     args.push(CString::new("-2").unwrap());
+        //     args.push(CString::new(r2_string.as_str()).unwrap());
+        //     args.push(CString::new("-b").unwrap());
+        //     args.push(CString::new(b_string.as_str()).unwrap());
+        // }
+        let b_string = self.barcode.as_ref().unwrap().clone().join(",");
+        if let Some(ref unpaired_reads) = &self.reads {
+            let r_string = unpaired_reads.clone().join(",");
+            args.push(CString::new("-r").unwrap());
+            args.push(CString::new(r_string.as_str()).unwrap());
+        } else if let (Some(ref r1), Some(ref r2)) = (&self.read1, &self.read2) {
             let r1_string = r1.clone().join(",");
             let r2_string = r2.clone().join(",");
-            let b_string = b.clone().join(",");
             args.push(CString::new("-1").unwrap());
             args.push(CString::new(r1_string.as_str()).unwrap());
             args.push(CString::new("-2").unwrap());
             args.push(CString::new(r2_string.as_str()).unwrap());
-            args.push(CString::new("-b").unwrap());
-            args.push(CString::new(b_string.as_str()).unwrap());
         }
+
+        args.push(CString::new("-b").unwrap());
+        args.push(CString::new(b_string.as_str()).unwrap());
         /*if self.list_geometries {
             args.push(CString::new("--list-geometries").unwrap());
         }*/
