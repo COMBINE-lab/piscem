@@ -13,6 +13,7 @@ trait DefaultMappingParams {
     const THRESHOLD: f32;
     const BIN_SIZE: u32;
     const BIN_OVERLAP: u32;
+    const BCLEN: u16;
 }
 
 struct DefaultParams;
@@ -26,6 +27,7 @@ impl DefaultMappingParams for DefaultParams {
     const THRESHOLD: f32 = 0.7;
     const BIN_SIZE: u32 = 1000;
     const BIN_OVERLAP: u32 = 300;
+    const BCLEN: u16 = 16;
 }
 
 /// Trait to produce a proper set of command-line arguments
@@ -608,6 +610,9 @@ pub(crate) struct MapSCAtacOpts {
     /// their mappings reported.
     #[arg(long, default_value_t = DefaultParams::MAX_READ_OCC, help_heading = "Advanced options")]
     pub max_read_occ: u32,
+
+    #[arg(long, default_value_t = DefaultParams::BCLEN, help_heading = "Advanced options")]
+    pub bclen: u16
 }
 
 impl AsArgv for MapSCAtacOpts {
@@ -727,6 +732,9 @@ impl AsArgv for MapSCAtacOpts {
 
         args.push(CString::new("--bin-overlap").unwrap());
         args.push(CString::new(self.bin_overlap.to_string()).unwrap());
+
+        args.push(CString::new("--bclen").unwrap());
+        args.push(CString::new(self.bclen.to_string()).unwrap());
 
         // args.push(CString::new("--max-hit-occ").unwrap());
         // args.push(CString::new(self.max_hit_occ.to_string()).unwrap());
