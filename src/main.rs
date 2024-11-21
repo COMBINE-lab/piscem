@@ -15,6 +15,7 @@ use piscem_commands::*;
 extern "C" {
     pub fn run_pesc_sc(args: c_int, argsv: *const *const c_char) -> c_int;
     pub fn run_pesc_bulk(args: c_int, argsv: *const *const c_char) -> c_int;
+    pub fn run_pesc_sc_atac(args: c_int, argsv: *const *const c_char) -> c_int;
 }
 
 #[link(name = "build_static", kind = "static")]
@@ -53,6 +54,10 @@ enum Commands {
     /// map reads for bulk processing
     #[command(arg_required_else_help = true)]
     MapBulk(MapBulkOpts),
+
+    /// map reads for scAtac processing
+    #[command(arg_required_else_help = true)]
+    MapSCAtac(MapSCAtacOpts),
 }
 
 // from: https://stackoverflow.com/questions/74322541/how-to-append-to-pathbuf
@@ -431,6 +436,33 @@ fn main() -> Result<(), anyhow::Error> {
             let args_len: c_int = args.len() as c_int;
 
             let map_ret = unsafe { run_pesc_sc(args_len, arg_ptrs.as_ptr()) };
+            if map_ret != 0 {
+                bail!("mapper returned exit code {}; failure", map_ret);
+            }
+        }
+
+        Commands::MapSCAtac(scatac_opts) => {
+            if scatac_opts.threads == 0 {
+                bail!(
+                    "the number of provided threads ({}) must be greater than 0.",
+                    scatac_opts.threads
+                );
+            }
+            if scatac_opts.threads > ncpus {
+                bail!("the number of provided threads ({}) should be <= the number of logical CPUs ({}).",
+                    scatac_opts.threads, ncpus);
+            }
+
+            let mut args = scatac_opts.as_argv()?;
+            if quiet {
+                args.push(CString::new("--quiet").unwrap());
+            }
+
+            info!("cmd: {:?}", args);
+            let arg_ptrs: Vec<*const c_char> = args.iter().map(|s| s.as_ptr()).collect();
+            let args_len: c_int = args.len() as c_int;
+
+            let map_ret = unsafe { run_pesc_sc_atac(args_len, arg_ptrs.as_ptr()) };
             if map_ret != 0 {
                 bail!("mapper returned exit code {}; failure", map_ret);
             }
