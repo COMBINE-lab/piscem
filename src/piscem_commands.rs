@@ -612,13 +612,13 @@ pub(crate) struct MapSCAtacOpts {
     pub max_read_occ: u32,
 
     #[arg(long, default_value_t = DefaultParams::BCLEN, help_heading = "Advanced options")]
-    pub bclen: u16
+    pub bclen: u16,
 }
 
 impl AsArgv for MapSCAtacOpts {
     fn as_argv(&self) -> Result<Vec<CString>> {
         // first check if the relevant index files exist
-        let mut idx_suffixes: Vec<String> = vec!["sshash".into(), "ctab".into(), "refinfo".into()];
+        let idx_suffixes: Vec<String> = vec!["sshash".into(), "ctab".into(), "refinfo".into()];
 
         // if !self.ignore_ambig_hits {
         //     idx_suffixes.push("ectab".into());
@@ -657,7 +657,7 @@ impl AsArgv for MapSCAtacOpts {
         // {
         //     let r1_string = r1.clone().join(",");
         //     let r2_string = r2.clone().join(",");
-        //     
+        //
         //     args.push(CString::new("-1").unwrap());
         //     args.push(CString::new(r1_string.as_str()).unwrap());
         //     args.push(CString::new("-2").unwrap());
