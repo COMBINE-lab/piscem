@@ -14,6 +14,7 @@ trait DefaultMappingParams {
     const BIN_SIZE: u32;
     const BIN_OVERLAP: u32;
     const BCLEN: u16;
+    const END_CACHE_CAPACITY: usize;
 }
 
 struct DefaultParams;
@@ -28,6 +29,7 @@ impl DefaultMappingParams for DefaultParams {
     const BIN_SIZE: u32 = 1000;
     const BIN_OVERLAP: u32 = 300;
     const BCLEN: u16 = 16;
+    const END_CACHE_CAPACITY: usize = 5_000_000;
 }
 
 /// Trait to produce a proper set of command-line arguments
@@ -611,8 +613,13 @@ pub(crate) struct MapSCAtacOpts {
     #[arg(long, default_value_t = DefaultParams::MAX_READ_OCC, help_heading = "Advanced options")]
     pub max_read_occ: u32,
 
+    /// the length of the barcode sequence
     #[arg(long, default_value_t = DefaultParams::BCLEN, help_heading = "Advanced options")]
     pub bclen: u16,
+
+    /// the capacity of the cache used to provide fast lookup for k-mers at the ends of unitigs
+    #[arg(long, default_value_t = DefaultParams::END_CACHE_CAPACITY, help_heading = "Advanced options")]
+    pub end_cache_capacity: usize,
 }
 
 impl AsArgv for MapSCAtacOpts {
@@ -735,6 +742,9 @@ impl AsArgv for MapSCAtacOpts {
 
         args.push(CString::new("--bclen").unwrap());
         args.push(CString::new(self.bclen.to_string()).unwrap());
+
+        args.push(CString::new("--end-cache-capacity").unwrap());
+        args.push(CString::new(self.end_cache_capacity.to_string()).unwrap());
 
         // args.push(CString::new("--max-hit-occ").unwrap());
         // args.push(CString::new(self.max_hit_occ.to_string()).unwrap());
