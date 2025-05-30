@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
+use serde_json::json;
 use tracing::{error, info, warn, Level};
 
 mod piscem_commands;
@@ -410,6 +411,23 @@ fn main() -> Result<(), anyhow::Error> {
                 // generally very small and may contain useful information
                 // about the references being indexed.
             }
+
+            let piscem_cpp_ver = env!("piscem-cpp-ver");
+            let cuttlefish_ver = env!("cuttlefish-ver");
+            let piscem_ver = clap::crate_version!();
+
+            let version_json = json!({
+                "piscem-cpp": piscem_cpp_ver,
+                "cuttlefish": cuttlefish_ver,
+                "piscem": piscem_ver
+            });
+
+            let mut fname = output.as_path().to_string_lossy().into_owned();
+            fname.push_str("_ver.json");
+
+            let fname = PathBuf::from(fname);
+            let ver_file = std::fs::File::create(fname)?;
+            serde_json::to_writer_pretty(ver_file, &version_json)?;
 
             info!("piscem build finished.");
         }
