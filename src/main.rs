@@ -4,29 +4,29 @@ use std::io;
 use std::os::raw::{c_char, c_int};
 use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::{Parser, Subcommand};
 use serde_json::json;
-use tracing::{error, info, warn, Level};
+use tracing::{Level, error, info, warn};
 
 mod piscem_commands;
 use piscem_commands::*;
 
 #[link(name = "pesc_static", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn run_pesc_sc(args: c_int, argsv: *const *const c_char) -> c_int;
     pub fn run_pesc_bulk(args: c_int, argsv: *const *const c_char) -> c_int;
     pub fn run_pesc_sc_atac(args: c_int, argsv: *const *const c_char) -> c_int;
 }
 
 #[link(name = "build_static", kind = "static")]
-extern "C" {
+unsafe extern "C" {
     pub fn run_build(args: c_int, argsv: *const *const c_char) -> c_int;
     pub fn run_build_poison_table(args: c_int, argsv: *const *const c_char) -> c_int;
 }
 
 #[link(name = "cfcore_static", kind = "static", modifiers = "+whole-archive")]
-extern "C" {
+unsafe extern "C" {
     pub fn cf_build(args: c_int, argsv: *const *const c_char) -> c_int;
 }
 
@@ -111,8 +111,11 @@ fn main() -> Result<(), anyhow::Error> {
                 );
             }
             if threads > ncpus {
-                bail!("the number of provided threads ({}) should be <= the number of logical CPUs ({}).",
-                    threads, ncpus);
+                bail!(
+                    "the number of provided threads ({}) should be <= the number of logical CPUs ({}).",
+                    threads,
+                    ncpus
+                );
             }
             if mlen >= klen {
                 bail!(
@@ -166,8 +169,13 @@ fn main() -> Result<(), anyhow::Error> {
             }
 
             if struct_file.exists() && (!seq_file.exists() || !seg_file.exists()) {
-                warn!("The prefix you have chosen for output already corresponds to an existing cDBG structure file {:?}.", struct_file.display());
-                warn!("However, the corresponding seq and seg files do not exist. Please either delete this structure file, choose another output prefix, or use the --overwrite flag.");
+                warn!(
+                    "The prefix you have chosen for output already corresponds to an existing cDBG structure file {:?}.",
+                    struct_file.display()
+                );
+                warn!(
+                    "However, the corresponding seq and seg files do not exist. Please either delete this structure file, choose another output prefix, or use the --overwrite flag."
+                );
                 bail!("Cannot write over existing index without the --overwrite flag.");
             }
 
@@ -239,7 +247,11 @@ fn main() -> Result<(), anyhow::Error> {
                     match std::fs::create_dir_all(&work_dir) {
                         Ok(_) => {}
                         Err(e) => {
-                            error!("when attempting to create working directory {}, encountered error {:#?}", &work_dir.display(), e);
+                            error!(
+                                "when attempting to create working directory {}, encountered error {:#?}",
+                                &work_dir.display(),
+                                e
+                            );
                             bail!(
                                 "Failed to create working directory {} for index construction : {:#?}",
                                 &work_dir.display(),
@@ -440,8 +452,11 @@ fn main() -> Result<(), anyhow::Error> {
                 );
             }
             if sc_opts.threads > ncpus {
-                bail!("the number of provided threads ({}) should be <= the number of logical CPUs ({}).",
-                    sc_opts.threads, ncpus);
+                bail!(
+                    "the number of provided threads ({}) should be <= the number of logical CPUs ({}).",
+                    sc_opts.threads,
+                    ncpus
+                );
             }
 
             let mut args = sc_opts.as_argv()?;
@@ -467,8 +482,11 @@ fn main() -> Result<(), anyhow::Error> {
                 );
             }
             if scatac_opts.threads > ncpus {
-                bail!("the number of provided threads ({}) should be <= the number of logical CPUs ({}).",
-                    scatac_opts.threads, ncpus);
+                bail!(
+                    "the number of provided threads ({}) should be <= the number of logical CPUs ({}).",
+                    scatac_opts.threads,
+                    ncpus
+                );
             }
 
             let mut args = scatac_opts.as_argv()?;
@@ -494,8 +512,11 @@ fn main() -> Result<(), anyhow::Error> {
                 );
             }
             if bulk_opts.threads > ncpus {
-                bail!("the number of provided threads ({}) should be <= the number of logical CPUs ({}).",
-                    bulk_opts.threads, ncpus);
+                bail!(
+                    "the number of provided threads ({}) should be <= the number of logical CPUs ({}).",
+                    bulk_opts.threads,
+                    ncpus
+                );
             }
 
             let mut args = bulk_opts.as_argv()?;

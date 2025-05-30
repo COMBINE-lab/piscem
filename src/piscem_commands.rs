@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use clap::{ArgGroup, Args};
 use std::ffi::CString;
 use std::path::{Path, PathBuf};
@@ -322,7 +322,11 @@ impl AsArgv for MapSCOpts {
             for s in idx_suffixes {
                 let req_file = idx_path.with_extension(s);
                 if !req_file.exists() {
-                    bail!("To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!", &self.index, req_file.display());
+                    bail!(
+                        "To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!",
+                        &self.index,
+                        req_file.display()
+                    );
                 }
             }
         }
@@ -393,9 +397,12 @@ impl AsArgv for MapSCOpts {
 fn get_index_path(base: &str) -> Result<PathBuf> {
     if Path::new(base).exists() {
         bail!(
-            concat!("The path {} was provided as the base path for the index, but this corresponds ",
-                    "to a specific existing file. The provided path should be the file stem (e.g. without the extension)."),
-            base);
+            concat!(
+                "The path {} was provided as the base path for the index, but this corresponds ",
+                "to a specific existing file. The provided path should be the file stem (e.g. without the extension)."
+            ),
+            base
+        );
     }
 
     if let Some(_ext) = Path::new(base).extension() {
@@ -418,7 +425,11 @@ impl AsArgv for MapBulkOpts {
             for s in idx_suffixes {
                 let req_file = idx_path.with_extension(s);
                 if !req_file.exists() {
-                    bail!("To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!", &self.index, req_file.display());
+                    bail!(
+                        "To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!",
+                        &self.index,
+                        req_file.display()
+                    );
                 }
             }
         }
@@ -442,11 +453,11 @@ impl AsArgv for MapBulkOpts {
             CString::new(self.output.into_os_string().to_str()?).unwrap(),
         ];
 
-        if let Some(ref unpaired_reads) = &self.reads {
+        if let Some(unpaired_reads) = &self.reads {
             let r_string = unpaired_reads.clone().join(",");
             args.push(CString::new("-r").unwrap());
             args.push(CString::new(r_string.as_str()).unwrap());
-        } else if let (Some(ref r1), Some(ref r2)) = (&self.read1, &self.read2) {
+        } else if let (Some(r1), Some(r2)) = (&self.read1, &self.read2) {
             let r1_string = r1.clone().join(",");
             let r2_string = r2.clone().join(",");
             args.push(CString::new("-1").unwrap());
@@ -636,7 +647,11 @@ impl AsArgv for MapSCAtacOpts {
             for s in idx_suffixes {
                 let req_file = idx_path.with_extension(s);
                 if !req_file.exists() {
-                    bail!("To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!", &self.index, req_file.display());
+                    bail!(
+                        "To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!",
+                        &self.index,
+                        req_file.display()
+                    );
                 }
             }
         }
@@ -673,11 +688,11 @@ impl AsArgv for MapSCAtacOpts {
         //     args.push(CString::new(b_string.as_str()).unwrap());
         // }
         let b_string = self.barcode.as_ref().unwrap().clone().join(",");
-        if let Some(ref unpaired_reads) = &self.reads {
+        if let Some(unpaired_reads) = &self.reads {
             let r_string = unpaired_reads.clone().join(",");
             args.push(CString::new("-r").unwrap());
             args.push(CString::new(r_string.as_str()).unwrap());
-        } else if let (Some(ref r1), Some(ref r2)) = (&self.read1, &self.read2) {
+        } else if let (Some(r1), Some(r2)) = (&self.read1, &self.read2) {
             let r1_string = r1.clone().join(",");
             let r2_string = r2.clone().join(",");
             args.push(CString::new("-1").unwrap());
