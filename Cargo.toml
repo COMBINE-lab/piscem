@@ -6,14 +6,14 @@ build = "build.rs"
 repository = "https://github.com/COMBINE-lab/piscem"
 
 [build-dependencies]
-cmake = "0.1.53"
+cmake = "0.1.54"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 num_cpus = "1.16.0"
-anyhow = "1.0.95"
-clap = { version = "4.5.27", features = [
+anyhow = "1.0.98"
+clap = { version = "4.5.39", features = [
   "cargo",
   "derive",
   "env",
@@ -41,7 +41,12 @@ cargo-dist-version = "0.28.5"
 # The installers to generate for each app
 installers = ["shell"]
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu"]
+targets = [
+  "aarch64-apple-darwin",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-apple-darwin",
+  "x86_64-unknown-linux-gnu",
+]
 # The archive format to use for non-windows builds (defaults .tar.xz)
 unix-archive = ".tar.gz"
 # CI backends to support
