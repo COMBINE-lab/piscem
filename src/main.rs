@@ -318,7 +318,7 @@ fn main() -> Result<(), anyhow::Error> {
             args.push(CString::new("-m").unwrap());
             args.push(CString::new(mlen.to_string()).unwrap()); // minimizer length
 
-            args.push(CString::new("--canonical-parsing").unwrap());
+            args.push(CString::new("--canonical").unwrap());
             if !no_ec_table {
                 args.push(CString::new("--build-ec-table").unwrap());
             }
