@@ -113,6 +113,12 @@ pub(crate) struct BuildOpts {
     #[arg(long, help_heading = "Index Construction Parameters")]
     pub no_ec_table: bool,
 
+    /// If provided (default is not to clip polyA), then reference sequences
+    /// ending with polyA tails of length greater than or equal to this value
+    /// will be clipped.
+    #[arg(long, help_heading = "Index Construction Parameters")]
+    pub polya_clip_length: Option<usize>,
+
     /// path to (optional) ',' sparated list of decoy sequences used to insert poison
     /// k-mer information into the index.
     #[arg(long, value_delimiter = ',')]

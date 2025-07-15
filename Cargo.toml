@@ -1,6 +1,6 @@
 [package]
 name = "piscem"
-version = "0.14.1"
+version = "0.14.2"
 edition = "2024"
 build = "build.rs"
 repository = "https://github.com/COMBINE-lab/piscem"
@@ -23,7 +23,7 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", default-features = true, features = [
   "env-filter",
 ] }
-prepare_fasta = "0.1.0"
+prepare_fasta = { version = "0.2.0" }
 serde_json = "1.0.140"
 
 [profile.release]

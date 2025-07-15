@@ -100,6 +100,7 @@ fn main() -> Result<(), anyhow::Error> {
             work_dir,
             overwrite,
             no_ec_table,
+            polya_clip_length,
             decoy_paths,
             seed,
         }) => {
@@ -193,7 +194,7 @@ fn main() -> Result<(), anyhow::Error> {
                     let configs = prepare_fasta::RecordParseConfig {
                         input: seqs.clone(),
                         output_stem: out_stem,
-                        polya_clip_length: None,
+                        polya_clip_length,
                     };
                     info!("Computing and recording reference signatures...");
                     prepare_fasta::parse_records(configs)?;
