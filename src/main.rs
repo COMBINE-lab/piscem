@@ -233,7 +233,7 @@ fn main() -> Result<(), anyhow::Error> {
             args.push(CString::new(klen.to_string()).unwrap());
             args.push(CString::new("--track-short-seqs").unwrap());
             args.push(CString::new("--poly-N-stretch").unwrap());
-
+            args.push(CString::new("--collate-output-in-mem").unwrap());
             // check if the provided work directory exists.
             // If not, then try and create it.
             match work_dir.try_exists() {

@@ -140,7 +140,7 @@ fn main() {
     //println!("cargo:rustc-link-lib=static=pesc_static");
     //println!("cargo:rustc-link-lib=static=build_static");
     println!("cargo:rustc-link-lib=static=sshash_static");
-    println!("cargo:rustc-link-lib=static=zcf");
+    println!("cargo:rustc-link-lib=static=z-ng");
     println!("cargo:rustc-link-lib=static=bz2");
     println!("cargo:rustc-link-lib=static=radicl");
 

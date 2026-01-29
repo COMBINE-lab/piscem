@@ -196,6 +196,12 @@ pub(crate) struct MapSCOpts {
     #[arg(long)]
     pub ignore_ambig_hits: bool,
 
+    /// includes the positions of each mapped read in the resulting RAD file.
+    /// Likewise, this will cause the `known_rad_type` tag of the resulting file to be `sc_rna_pos`
+    /// rather than the default `sc_rna_basic`. (incompatible with alevin-fry < 0.12).
+    #[arg(long)]
+    pub with_position: bool,
+
     /// determines the maximum cardinality equivalence class
     /// (number of (txp, orientation status) pairs) to examine (cannot be used with
     /// --ignore-ambig-hits).
@@ -368,6 +374,10 @@ impl AsArgv for MapSCOpts {
         /*if self.list_geometries {
             args.push(CString::new("--list-geometries").unwrap());
         }*/
+
+        if self.with_position {
+            args.push(CString::new("--with-position").unwrap());
+        }
 
         if self.ignore_ambig_hits {
             args.push(CString::new("--ignore-ambig-hits").unwrap());
