@@ -127,15 +127,26 @@ jobs:
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
             echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           fi
-      - name: "Install CMake 3.31 (macOS only)"
+      - name: "Install CMake 3.31.6"
         if: "runner.os == 'macOS'"
         run: |
-          brew uninstall --ignore-dependencies cmake || true
-          brew install cmake@3.31 || brew install https://raw.githubusercontent.com/Homebrew/homebrew-core/cmake-3.31.6/Formula/c/cmake.rb
-          brew link cmake@3.31 --force
+          CMAKE_VERSION=3.31.6
+          echo "Downloading CMake ${CMAKE_VERSION}..."
+          curl -L -o cmake.tar.gz "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-macos-universal.tar.gz"
+          echo "Extracting CMake..."
+          tar -xzf cmake.tar.gz
+          echo "Installing CMake..."
+          sudo mkdir -p /Applications/CMake.app/Contents
+          sudo cp -R "cmake-${CMAKE_VERSION}-macos-universal/CMake.app/Contents/"* /Applications/CMake.app/Contents/
+          echo "Adding CMake to PATH..."
+          echo "/Applications/CMake.app/Contents/bin" >> $GITHUB_PATH
+          export PATH="/Applications/CMake.app/Contents/bin:$PATH"
+          echo "CMake installation complete"
       - name: "Verify CMake version"
         if: "runner.os == 'macOS'"
-        run: "cmake --version"
+        run: |
+          cmake --version
+          which cmake
       - name: Install dist
         run: ${{ matrix.install_dist.run }}
       # Get the dist-manifest
