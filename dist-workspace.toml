@@ -8,22 +8,11 @@ cargo-dist-version = "0.30.3"
 # The installers to generate for each app
 installers = ["shell"]
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = [
-  "aarch64-apple-darwin",
-  "aarch64-unknown-linux-gnu",
-  "x86_64-apple-darwin",
-  "x86_64-unknown-linux-gnu",
-]
-# The archive format to use for non-windows builds (defaults .tar.xz)
-unix-archive = ".tar.gz"
+targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
 # CI backends to support
 ci = "github"
-# Which actions to run on pull requests
-pr-run-mode = "plan"
 # Whether to install an updater program
 install-updater = true
-# Generate and dist a source tarball
-source-tarball = false
 # Path that installers should place binaries in
 install-path = "CARGO_HOME"
 ## since this is cross-language and 
@@ -32,6 +21,8 @@ install-path = "CARGO_HOME"
 ## and would be of limited utility anyway.
 # debug = true
 # split-debuginfo = "packed"
+
+github-build-setup = 'cmake-setup.yml'
 
 [[dist.extra-artifacts]]
 artifacts = ["source.tar.gz", "source.tar.gz.sha256"]

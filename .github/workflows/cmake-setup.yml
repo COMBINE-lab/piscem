@@ -1,0 +1,10 @@
+- name: Install CMake 3.31 (macOS only)
+  if: runner.os == 'macOS'
+  run: |
+    brew uninstall --ignore-dependencies cmake || true
+    brew install cmake@3.31 || brew install https://raw.githubusercontent.com/Homebrew/homebrew-core/cmake-3.31.6/Formula/c/cmake.rb
+    brew link cmake@3.31 --force
+
+- name: Verify CMake version
+  if: runner.os == 'macOS'
+  run: cmake --version
