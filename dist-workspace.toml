@@ -25,12 +25,12 @@ install-path = "CARGO_HOME"
 github-build-setup = 'cmake-setup.yml'
 
 [[dist.extra-artifacts]]
-artifacts = ["source.tar.gz", "source.tar.gz.sha256"]
+artifacts = ["source-full.tar.gz", "source-full.tar.gz.sha256"]
 build = ["bash", "-c", """
   set -e
   python3 -m pip install --quiet git-archive-all
-  git-archive-all --force-submodules --prefix=piscem/ source.tar.gz
-  shasum -a 256 source.tar.gz > source.tar.gz.sha256
+  git-archive-all --force-submodules --prefix=piscem/ source-full.tar.gz
+  shasum -a 256 source-full.tar.gz > source-full.tar.gz.sha256
   """]
 
 [dist.github-custom-runners]
