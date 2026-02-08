@@ -104,6 +104,8 @@ fn main() -> Result<(), anyhow::Error> {
             decoy_paths,
             seed,
         }) => {
+            // See https://github.com/COMBINE-lab/simpleaf/issues/185; temporarily check
+            // that we are using a power of 2 number of threads and inform the user.
             info!("starting piscem build");
             if threads == 0 {
                 bail!(
@@ -125,6 +127,19 @@ fn main() -> Result<(), anyhow::Error> {
                     klen
                 );
             }
+
+            let idxthreads = if !threads.is_power_of_two() {
+                let idxthreads = 1_usize.max(threads.next_power_of_two() / 2);
+                warn!(
+                    r#"The number of threads used for the indexing step must be a power of 2. 
+Using {} for cDBG construction and {} for indexing.
+NOTE: This is a temporary restriction and should be lifted in a future version of piscem."#,
+                    threads, idxthreads
+                );
+                idxthreads
+            } else {
+                threads
+            };
 
             // if the decoy sequences are provided, ensure they are valid paths
             if let Some(ref decoys) = decoy_paths {
@@ -330,7 +345,7 @@ fn main() -> Result<(), anyhow::Error> {
             args.push(CString::new(work_dir.as_path().to_string_lossy().into_owned()).unwrap());
 
             args.push(CString::new("-t").unwrap());
-            args.push(CString::new(threads.to_string()).unwrap());
+            args.push(CString::new(idxthreads.to_string()).unwrap());
 
             args.push(CString::new("--seed").unwrap());
             args.push(CString::new(seed.to_string()).unwrap());
