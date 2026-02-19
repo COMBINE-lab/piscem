@@ -11,7 +11,7 @@ cmake = "0.1.57"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-piscem-rs = { path = ".." }
+piscem-rs = { git = "https://github.com/COMBINE-lab/piscem-rs.git", branch = "main" }
 num_cpus = "1.17.0"
 anyhow = "1.0.100"
 clap = { version = "4.5.56", features = [
