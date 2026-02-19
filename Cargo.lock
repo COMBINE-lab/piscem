@@ -1483,6 +1483,7 @@ dependencies = [
  "cmake",
  "num_cpus",
  "piscem-rs",
+ "pkg-config",
  "prepare_fasta",
  "serde_json",
  "tracing",
@@ -1492,6 +1493,7 @@ dependencies = [
 [[package]]
 name = "piscem-rs"
 version = "0.1.0"
+source = "git+https://github.com/COMBINE-lab/piscem-rs.git?branch=main#70f51d6a358df9a3a351d44a0890bfad1e3ae91d"
 dependencies = [
  "ahash",
  "anyhow",
@@ -1904,6 +1906,7 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 [[package]]
 name = "sshash-lib"
 version = "0.3.0"
+source = "git+https://github.com/COMBINE-lab/sshash-rs.git?branch=main#aac594457ecdcf0cd5ca5ecbbe6c496206828b2b"
 dependencies = [
  "anyhow",
  "epserde",

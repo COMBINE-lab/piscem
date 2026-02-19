@@ -1,5 +1,5 @@
 [env]
 cuttlefish-ver = "e24249cfd4566ad74ec02870af5c0a7069f738e2"
 
-[patch.'https://github.com/COMBINE-lab/piscem-rs.git']
-piscem-rs = { path = ".." }
+#[patch.'https://github.com/COMBINE-lab/piscem-rs.git']
+#piscem-rs = { path = ".." }
