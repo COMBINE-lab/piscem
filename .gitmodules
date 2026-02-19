@@ -2,3 +2,6 @@
 	path = cuttlefish
 	url = https://github.com/COMBINE-lab/cuttlefish.git
 	branch = develop
+[submodule "zlib-ng"]
+	path = zlib-ng
+	url = https://github.com/zlib-ng/zlib-ng.git
