@@ -1,8 +1,6 @@
 use anyhow::{Result, anyhow, bail};
 use clap::{ArgGroup, Args};
-use std::ffi::CString;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+use std::path::PathBuf;
 
 trait DefaultMappingParams {
     const MAX_EC_CARD: u32;
@@ -30,14 +28,6 @@ impl DefaultMappingParams for DefaultParams {
     const BIN_OVERLAP: u32 = 300;
     const BCLEN: u16 = 16;
     const END_CACHE_CAPACITY: usize = 5_000_000;
-}
-
-/// Trait to produce a proper set of command-line arguments
-/// from a populated struct.  There is a single method,
-/// `as_argv`, which produces a Vec<CString> that can be parsed
-/// and passed to a C function as the `char** argv` parameter.
-pub trait AsArgv {
-    fn as_argv(&self) -> Result<Vec<CString>>;
 }
 
 fn klen_is_good(s: &str) -> Result<usize> {
@@ -140,10 +130,6 @@ pub(crate) struct MapSCOpts {
     #[arg(short, long, help_heading = "Input")]
     pub index: String,
 
-    /// list available geometries supported by the underlying `pesc-sc` mapper
-    // #[arg(long, help_heading = "Advanced")]
-    // pub list_geometries: bool,
-
     /// geometry of barcode, umi and read
     #[arg(short, long)]
     pub geometry: String,
@@ -197,8 +183,6 @@ pub(crate) struct MapSCOpts {
     pub ignore_ambig_hits: bool,
 
     /// includes the positions of each mapped read in the resulting RAD file.
-    /// Likewise, this will cause the `known_rad_type` tag of the resulting file to be `sc_rna_pos`
-    /// rather than the default `sc_rna_basic`. (incompatible with alevin-fry < 0.12).
     #[arg(long)]
     pub with_position: bool,
 
@@ -298,7 +282,6 @@ pub(crate) struct MapBulkOpts {
     #[arg(
         long,
         short,
-        requires = "check_ambig_hits",
         default_value_t = DefaultParams::MAX_EC_CARD,
         conflicts_with = "ignore_ambig_hits",
         help_heading = "Advanced options"
@@ -320,198 +303,6 @@ pub(crate) struct MapBulkOpts {
     pub max_read_occ: u32,
 }
 
-impl AsArgv for MapSCOpts {
-    fn as_argv(&self) -> Result<Vec<CString>> {
-        // first check if the relevant index files exist
-        let mut idx_suffixes: Vec<String> = vec!["sshash".into(), "ctab".into(), "refinfo".into()];
-
-        if !self.ignore_ambig_hits {
-            idx_suffixes.push("ectab".into());
-        }
-
-        {
-            let idx_path = get_index_path(&self.index)?;
-            for s in idx_suffixes {
-                let req_file = idx_path.with_extension(s);
-                if !req_file.exists() {
-                    bail!(
-                        "To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!",
-                        &self.index,
-                        req_file.display()
-                    );
-                }
-            }
-        }
-
-        let r1_string = self.read1.join(",");
-        let r2_string = self.read2.join(",");
-
-        let mut args: Vec<CString> = vec![
-            CString::new("sc_ref_mapper").unwrap(),
-            CString::new("-i").unwrap(),
-            CString::new(self.index.clone()).unwrap(),
-            CString::new("-g").unwrap(),
-            CString::new(self.geometry.clone()).unwrap(),
-            CString::new("-1").unwrap(),
-            CString::new(r1_string.as_str()).unwrap(),
-            CString::new("-2").unwrap(),
-            CString::new(r2_string.as_str()).unwrap(),
-            CString::new("-t").unwrap(),
-            CString::new(self.threads.to_string()).unwrap(),
-            CString::new("-o").unwrap(),
-            #[cfg(not(target_os = "windows"))]
-            CString::new(std::os::unix::ffi::OsStrExt::as_bytes(
-                <PathBuf as Clone>::clone(&self.output)
-                    .into_os_string()
-                    .as_os_str(),
-            ))
-            .unwrap(),
-            // NOTE: Windows is completely untested
-            #[cfg(target_os = "windows")]
-            CString::new(self.output.into_os_string().to_str()?).unwrap(),
-        ];
-
-        /*if self.list_geometries {
-            args.push(CString::new("--list-geometries").unwrap());
-        }*/
-
-        if self.with_position {
-            args.push(CString::new("--with-position").unwrap());
-        }
-
-        if self.ignore_ambig_hits {
-            args.push(CString::new("--ignore-ambig-hits").unwrap());
-        } else {
-            args.push(CString::new("--max-ec-card").unwrap());
-            args.push(CString::new(self.max_ec_card.to_string()).unwrap());
-        }
-
-        if self.no_poison {
-            args.push(CString::new("--no-poison").unwrap());
-        }
-
-        args.push(CString::new("--skipping-strategy").unwrap());
-        args.push(CString::new(self.skipping_strategy.to_string()).unwrap());
-
-        if self.struct_constraints {
-            args.push(CString::new("--struct-constraints").unwrap());
-        }
-
-        args.push(CString::new("--max-hit-occ").unwrap());
-        args.push(CString::new(self.max_hit_occ.to_string()).unwrap());
-
-        args.push(CString::new("--max-hit-occ-recover").unwrap());
-        args.push(CString::new(self.max_hit_occ_recover.to_string()).unwrap());
-
-        args.push(CString::new("--max-read-occ").unwrap());
-        args.push(CString::new(self.max_read_occ.to_string()).unwrap());
-
-        Ok(args)
-    }
-}
-
-fn get_index_path(base: &str) -> Result<PathBuf> {
-    if Path::new(base).exists() {
-        bail!(
-            concat!(
-                "The path {} was provided as the base path for the index, but this corresponds ",
-                "to a specific existing file. The provided path should be the file stem (e.g. without the extension)."
-            ),
-            base
-        );
-    }
-
-    if let Some(_ext) = Path::new(base).extension() {
-        Ok(PathBuf::from_str(&format!("{}.dummy", base))?)
-    } else {
-        Ok(PathBuf::from_str(base)?)
-    }
-}
-
-impl AsArgv for MapBulkOpts {
-    fn as_argv(&self) -> Result<Vec<CString>> {
-        let mut idx_suffixes: Vec<String> = vec!["sshash".into(), "ctab".into(), "refinfo".into()];
-
-        if !self.ignore_ambig_hits {
-            idx_suffixes.push("ectab".into());
-        }
-
-        {
-            let idx_path = get_index_path(&self.index)?;
-            for s in idx_suffixes {
-                let req_file = idx_path.with_extension(s);
-                if !req_file.exists() {
-                    bail!(
-                        "To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!",
-                        &self.index,
-                        req_file.display()
-                    );
-                }
-            }
-        }
-
-        let mut args: Vec<CString> = vec![
-            CString::new("bulk_ref_mapper").unwrap(),
-            CString::new("-i").unwrap(),
-            CString::new(self.index.clone()).unwrap(),
-            CString::new("-t").unwrap(),
-            CString::new(self.threads.to_string()).unwrap(),
-            CString::new("-o").unwrap(),
-            #[cfg(not(target_os = "windows"))]
-            CString::new(std::os::unix::ffi::OsStrExt::as_bytes(
-                <PathBuf as Clone>::clone(&self.output)
-                    .into_os_string()
-                    .as_os_str(),
-            ))
-            .unwrap(),
-            // NOTE: Windows is completely untested
-            #[cfg(target_os = "windows")]
-            CString::new(self.output.into_os_string().to_str()?).unwrap(),
-        ];
-
-        if let Some(unpaired_reads) = &self.reads {
-            let r_string = unpaired_reads.clone().join(",");
-            args.push(CString::new("-r").unwrap());
-            args.push(CString::new(r_string.as_str()).unwrap());
-        } else if let (Some(r1), Some(r2)) = (&self.read1, &self.read2) {
-            let r1_string = r1.clone().join(",");
-            let r2_string = r2.clone().join(",");
-            args.push(CString::new("-1").unwrap());
-            args.push(CString::new(r1_string.as_str()).unwrap());
-            args.push(CString::new("-2").unwrap());
-            args.push(CString::new(r2_string.as_str()).unwrap());
-        }
-
-        if self.ignore_ambig_hits {
-            args.push(CString::new("--ignore-ambig-hits").unwrap());
-        } else {
-            args.push(CString::new("--max-ec-card").unwrap());
-            args.push(CString::new(self.max_ec_card.to_string()).unwrap());
-        }
-
-        if self.no_poison {
-            args.push(CString::new("--no-poison").unwrap());
-        }
-
-        args.push(CString::new("--skipping-strategy").unwrap());
-        args.push(CString::new(self.skipping_strategy.to_string()).unwrap());
-
-        if self.struct_constraints {
-            args.push(CString::new("--struct-constraints").unwrap());
-        }
-
-        args.push(CString::new("--max-hit-occ").unwrap());
-        args.push(CString::new(self.max_hit_occ.to_string()).unwrap());
-
-        args.push(CString::new("--max-hit-occ-recover").unwrap());
-        args.push(CString::new(self.max_hit_occ_recover.to_string()).unwrap());
-
-        args.push(CString::new("--max-read-occ").unwrap());
-        args.push(CString::new(self.max_read_occ.to_string()).unwrap());
-
-        Ok(args)
-    }
-}
 
 #[derive(Args, Clone, Debug)]
 pub(crate) struct MapSCAtacOpts {
@@ -542,13 +333,12 @@ pub(crate) struct MapSCAtacOpts {
     #[arg(short = 'r', long, help_heading = "Input", value_delimiter = ',', conflicts_with_all = ["read1", "read2"])]
     pub reads: Option<Vec<String>>,
 
-    /// path to a ',' separated list of read 2 files
+    /// path to a ',' separated list of barcode files
     #[arg(
         short = 'b',
         long,
         help_heading = "Input",
-        value_delimiter = ',',
-        requires = "read1"
+        value_delimiter = ','
     )]
     pub barcode: Option<Vec<String>>,
 
@@ -647,145 +437,4 @@ pub(crate) struct MapSCAtacOpts {
     /// the capacity of the cache used to provide fast lookup for k-mers at the ends of unitigs
     #[arg(long, default_value_t = DefaultParams::END_CACHE_CAPACITY, help_heading = "Advanced options")]
     pub end_cache_capacity: usize,
-}
-
-impl AsArgv for MapSCAtacOpts {
-    fn as_argv(&self) -> Result<Vec<CString>> {
-        // first check if the relevant index files exist
-        let idx_suffixes: Vec<String> = vec!["sshash".into(), "ctab".into(), "refinfo".into()];
-
-        // if !self.ignore_ambig_hits {
-        //     idx_suffixes.push("ectab".into());
-        // }
-
-        {
-            let idx_path = get_index_path(&self.index)?;
-            for s in idx_suffixes {
-                let req_file = idx_path.with_extension(s);
-                if !req_file.exists() {
-                    bail!(
-                        "To load the index with the specified prefix {}, piscem expects the file {} to exist, but it does not!",
-                        &self.index,
-                        req_file.display()
-                    );
-                }
-            }
-        }
-
-        let mut args: Vec<CString> = vec![
-            CString::new("scatac_ref_mapper").unwrap(),
-            CString::new("-i").unwrap(),
-            CString::new(self.index.clone()).unwrap(),
-            CString::new("-t").unwrap(),
-            CString::new(self.threads.to_string()).unwrap(),
-            CString::new("-o").unwrap(),
-            #[cfg(not(target_os = "windows"))]
-            CString::new(std::os::unix::ffi::OsStrExt::as_bytes(
-                <PathBuf as Clone>::clone(&self.output)
-                    .into_os_string()
-                    .as_os_str(),
-            ))
-            .unwrap(),
-            // NOTE: Windows is completely untested
-            #[cfg(target_os = "windows")]
-            CString::new(self.output.into_os_string().to_str()?).unwrap(),
-        ];
-
-        // if let (Some(ref r1), Some(ref r2), Some(ref b)) = (&self.read1, &self.read2, &self.barcode)
-        // {
-        //     let r1_string = r1.clone().join(",");
-        //     let r2_string = r2.clone().join(",");
-        //
-        //     args.push(CString::new("-1").unwrap());
-        //     args.push(CString::new(r1_string.as_str()).unwrap());
-        //     args.push(CString::new("-2").unwrap());
-        //     args.push(CString::new(r2_string.as_str()).unwrap());
-        //     args.push(CString::new("-b").unwrap());
-        //     args.push(CString::new(b_string.as_str()).unwrap());
-        // }
-        let b_string = self.barcode.as_ref().unwrap().clone().join(",");
-        if let Some(unpaired_reads) = &self.reads {
-            let r_string = unpaired_reads.clone().join(",");
-            args.push(CString::new("-r").unwrap());
-            args.push(CString::new(r_string.as_str()).unwrap());
-        } else if let (Some(r1), Some(r2)) = (&self.read1, &self.read2) {
-            let r1_string = r1.clone().join(",");
-            let r2_string = r2.clone().join(",");
-            args.push(CString::new("-1").unwrap());
-            args.push(CString::new(r1_string.as_str()).unwrap());
-            args.push(CString::new("-2").unwrap());
-            args.push(CString::new(r2_string.as_str()).unwrap());
-        }
-
-        args.push(CString::new("-b").unwrap());
-        args.push(CString::new(b_string.as_str()).unwrap());
-        /*if self.list_geometries {
-            args.push(CString::new("--list-geometries").unwrap());
-        }*/
-
-        // if self.ignore_ambig_hits {
-        //     args.push(CString::new("--ignore-ambig-hits").unwrap());
-        // } else {
-        //     args.push(CString::new("--max-ec-card").unwrap());
-        //     args.push(CString::new(self.max_ec_card.to_string()).unwrap());
-        // }
-
-        if self.no_poison {
-            args.push(CString::new("--no-poison").unwrap());
-        }
-
-        args.push(CString::new("--skipping-strategy").unwrap());
-        args.push(CString::new(self.skipping_strategy.to_string()).unwrap());
-
-        if self.struct_constraints {
-            args.push(CString::new("--struct-constraints").unwrap());
-        }
-
-        if self.bed_format {
-            args.push(CString::new("--bed-format").unwrap());
-        }
-
-        if self.use_chr {
-            args.push(CString::new("--use-chr").unwrap());
-        }
-
-        if self.sam_format {
-            args.push(CString::new("--sam-format").unwrap());
-        }
-
-        if self.check_kmer_orphan {
-            args.push(CString::new("--kmers-orphans").unwrap());
-        }
-
-        args.push(CString::new("--thr").unwrap());
-        args.push(CString::new(self.thr.to_string()).unwrap());
-
-        if self.no_tn5_shift {
-            args.push(CString::new("--tn5-shift").unwrap());
-            args.push(CString::new("false").unwrap());
-        }
-
-        args.push(CString::new("--bin-size").unwrap());
-        args.push(CString::new(self.bin_size.to_string()).unwrap());
-
-        args.push(CString::new("--bin-overlap").unwrap());
-        args.push(CString::new(self.bin_overlap.to_string()).unwrap());
-
-        args.push(CString::new("--bclen").unwrap());
-        args.push(CString::new(self.bclen.to_string()).unwrap());
-
-        args.push(CString::new("--end-cache-capacity").unwrap());
-        args.push(CString::new(self.end_cache_capacity.to_string()).unwrap());
-
-        // args.push(CString::new("--max-hit-occ").unwrap());
-        // args.push(CString::new(self.max_hit_occ.to_string()).unwrap());
-
-        // args.push(CString::new("--max-hit-occ-recover").unwrap());
-        // args.push(CString::new(self.max_hit_occ_recover.to_string()).unwrap());
-
-        // args.push(CString::new("--max-read-occ").unwrap());
-        // args.push(CString::new(self.max_read_occ.to_string()).unwrap());
-
-        Ok(args)
-    }
 }

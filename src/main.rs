@@ -1,4 +1,3 @@
-use std::ffi::CString;
 use std::ffi::{OsStr, OsString};
 use std::io;
 use std::os::raw::{c_char, c_int};
@@ -12,18 +11,16 @@ use tracing::{Level, error, info, warn};
 mod piscem_commands;
 use piscem_commands::*;
 
-#[link(name = "pesc_static", kind = "static")]
-unsafe extern "C" {
-    pub fn run_pesc_sc(args: c_int, argsv: *const *const c_char) -> c_int;
-    pub fn run_pesc_bulk(args: c_int, argsv: *const *const c_char) -> c_int;
-    pub fn run_pesc_sc_atac(args: c_int, argsv: *const *const c_char) -> c_int;
-}
-
-#[link(name = "build_static", kind = "static")]
-unsafe extern "C" {
-    pub fn run_build(args: c_int, argsv: *const *const c_char) -> c_int;
-    pub fn run_build_poison_table(args: c_int, argsv: *const *const c_char) -> c_int;
-}
+use piscem_rs::cli::build as rs_build;
+use piscem_rs::cli::poison as rs_poison;
+use piscem_rs::cli::map_bulk;
+use piscem_rs::cli::map_scrna;
+use piscem_rs::cli::map_scatac;
+use piscem_rs::cli::build::BuildArgs;
+use piscem_rs::cli::poison::BuildPoisonArgs;
+use piscem_rs::cli::map_scrna::MapScrnaArgs;
+use piscem_rs::cli::map_bulk::MapBulkArgs;
+use piscem_rs::cli::map_scatac::MapScatacArgs;
 
 #[link(name = "cfcore_static", kind = "static", modifiers = "+whole-archive")]
 unsafe extern "C" {
@@ -70,7 +67,6 @@ fn append_to_path(p: impl Into<OsString>, s: impl AsRef<OsStr>) -> PathBuf {
 
 fn main() -> Result<(), anyhow::Error> {
     let cli_args = Cli::parse();
-    //env_logger::Builder::from_env(Env::default().default_filter_or("warn")).init();
 
     let quiet = cli_args.quiet;
     if quiet {
@@ -104,8 +100,9 @@ fn main() -> Result<(), anyhow::Error> {
             decoy_paths,
             seed,
         }) => {
-            // See https://github.com/COMBINE-lab/simpleaf/issues/185; temporarily check
-            // that we are using a power of 2 number of threads and inform the user.
+            use std::ffi::CString;
+            use std::os::raw::c_char;
+
             info!("starting piscem build");
             if threads == 0 {
                 bail!(
@@ -131,7 +128,7 @@ fn main() -> Result<(), anyhow::Error> {
             let idxthreads = if !threads.is_power_of_two() {
                 let idxthreads = 1_usize.max(threads.next_power_of_two() / 2);
                 warn!(
-                    r#"The number of threads used for the indexing step must be a power of 2. 
+                    r#"The number of threads used for the indexing step must be a power of 2.
 Using {} for cDBG construction and {} for indexing.
 NOTE: This is a temporary restriction and should be lifted in a future version of piscem."#,
                     threads, idxthreads
@@ -170,7 +167,7 @@ NOTE: This is a temporary restriction and should be lifted in a future version o
             let seg_file = append_to_path(cf_base_path, ".cf_seg");
             let seq_file = append_to_path(cf_base_path, ".cf_seq");
             let struct_file = append_to_path(cf_base_path, ".json");
-            let mut build_ret;
+            let build_ret;
 
             if overwrite {
                 if struct_file.exists() {
@@ -197,9 +194,6 @@ NOTE: This is a temporary restriction and should be lifted in a future version o
 
             args.push(CString::new("cdbg_builder").unwrap());
 
-            // We can treat the different input options independently
-            // here because the argument parser should have enforced
-            // their exclusivity.
             let mut has_input = false;
 
             if let Some(seqs) = ref_seqs {
@@ -324,87 +318,26 @@ NOTE: This is a temporary restriction and should be lifted in a future version o
                 );
             }
 
-            args.clear();
-            args.push(CString::new("ref_index_builder").unwrap());
+            // Build piscem-rs index
+            rs_build::run(BuildArgs {
+                input: cf_out.clone(),
+                output: output.clone(),
+                klen,
+                mlen,
+                threads: idxthreads,
+                build_ec_table: !no_ec_table,
+                canonical: true,
+                seed,
+                single_mphf: false,
+            })?;
 
-            args.push(CString::new("-i").unwrap());
-            args.push(CString::new(cf_out.as_path().to_string_lossy().into_owned()).unwrap());
-            args.push(CString::new("-k").unwrap());
-            args.push(CString::new(klen.to_string()).unwrap());
-            args.push(CString::new("-m").unwrap());
-            args.push(CString::new(mlen.to_string()).unwrap()); // minimizer length
-
-            args.push(CString::new("--canonical").unwrap());
-            if !no_ec_table {
-                args.push(CString::new("--build-ec-table").unwrap());
-            }
-            args.push(CString::new("-o").unwrap());
-            args.push(CString::new(output.as_path().to_string_lossy().into_owned()).unwrap());
-
-            args.push(CString::new("-d").unwrap());
-            args.push(CString::new(work_dir.as_path().to_string_lossy().into_owned()).unwrap());
-
-            args.push(CString::new("-t").unwrap());
-            args.push(CString::new(idxthreads.to_string()).unwrap());
-
-            args.push(CString::new("--seed").unwrap());
-            args.push(CString::new(seed.to_string()).unwrap());
-
-            if quiet {
-                args.push(CString::new("--quiet").unwrap());
-            }
-
-            {
-                println!("{:?}", args);
-                let arg_ptrs: Vec<*const c_char> = args.iter().map(|s| s.as_ptr()).collect();
-                let args_len: c_int = args.len() as c_int;
-                build_ret = unsafe { run_build(args_len, arg_ptrs.as_ptr()) };
-            }
-
-            if build_ret != 0 {
-                bail!("indexer returned exit code {}; failure.", build_ret);
-            }
-
-            // now, build the poison table if there are decoys
+            // Build poison table if decoys were provided
             if let Some(decoy_pathbufs) = decoy_paths {
-                args.clear();
-                args.push(CString::new("poison_table_builder").unwrap());
-
-                // index is the one we just built
-                args.push(CString::new("-i").unwrap());
-                args.push(CString::new(output.as_path().to_string_lossy().into_owned()).unwrap());
-
-                args.push(CString::new("-t").unwrap());
-                args.push(CString::new(threads.to_string()).unwrap());
-
-                if overwrite {
-                    args.push(CString::new("--overwrite").unwrap());
-                }
-
-                let path_args = decoy_pathbufs
-                    .into_iter()
-                    .map(|x| x.to_string_lossy().into_owned())
-                    .collect::<Vec<String>>()
-                    .join(",");
-                args.push(CString::new("-d").unwrap());
-                args.push(CString::new(path_args).unwrap());
-
-                if quiet {
-                    args.push(CString::new("--quiet").unwrap());
-                }
-
-                {
-                    println!("{:?}", args);
-                    let arg_ptrs: Vec<*const c_char> = args.iter().map(|s| s.as_ptr()).collect();
-                    let args_len: c_int = args.len() as c_int;
-                    build_ret = unsafe { run_build_poison_table(args_len, arg_ptrs.as_ptr()) };
-                }
-                if build_ret != 0 {
-                    bail!(
-                        "building poison table returned exit code {}; failure.",
-                        build_ret
-                    );
-                }
+                rs_poison::run(BuildPoisonArgs {
+                    index: output.clone(),
+                    decoys: decoy_pathbufs,
+                    threads,
+                })?;
             }
 
             if !keep_intermediate_dbg {
@@ -440,12 +373,12 @@ NOTE: This is a temporary restriction and should be lifted in a future version o
                 // about the references being indexed.
             }
 
-            let piscem_cpp_ver = env!("piscem-cpp-ver");
+            let piscem_rs_ver = piscem_rs::VERSION;
             let cuttlefish_ver = env!("cuttlefish-ver");
             let piscem_ver = clap::crate_version!();
 
             let version_json = json!({
-                "piscem-cpp": piscem_cpp_ver,
+                "piscem-rs": piscem_rs_ver,
                 "cuttlefish": cuttlefish_ver,
                 "piscem": piscem_ver
             });
@@ -475,19 +408,28 @@ NOTE: This is a temporary restriction and should be lifted in a future version o
                 );
             }
 
-            let mut args = sc_opts.as_argv()?;
-            if quiet {
-                args.push(CString::new("--quiet").unwrap());
+            if sc_opts.struct_constraints {
+                warn!("--struct-constraints is not supported by piscem-rs and will be ignored");
             }
 
-            info!("cmd: {:?}", args);
-            let arg_ptrs: Vec<*const c_char> = args.iter().map(|s| s.as_ptr()).collect();
-            let args_len: c_int = args.len() as c_int;
-
-            let map_ret = unsafe { run_pesc_sc(args_len, arg_ptrs.as_ptr()) };
-            if map_ret != 0 {
-                bail!("mapper returned exit code {}; failure", map_ret);
-            }
+            let args = MapScrnaArgs {
+                index: PathBuf::from(&sc_opts.index),
+                read1: sc_opts.read1.iter().map(PathBuf::from).collect(),
+                read2: sc_opts.read2.iter().map(PathBuf::from).collect(),
+                geometry: sc_opts.geometry,
+                output: sc_opts.output.clone(),
+                threads: sc_opts.threads,
+                skipping_strategy: sc_opts.skipping_strategy,
+                no_poison: sc_opts.no_poison,
+                ignore_ambig_hits: sc_opts.ignore_ambig_hits,
+                max_ec_card: sc_opts.max_ec_card,
+                max_hit_occ: sc_opts.max_hit_occ as usize,
+                max_hit_occ_recover: sc_opts.max_hit_occ_recover as usize,
+                max_read_occ: sc_opts.max_read_occ as usize,
+                with_position: sc_opts.with_position,
+                quiet,
+            };
+            map_scrna::run(args)?;
         }
 
         Commands::MapSCAtac(scatac_opts) => {
@@ -505,19 +447,44 @@ NOTE: This is a temporary restriction and should be lifted in a future version o
                 );
             }
 
-            let mut args = scatac_opts.as_argv()?;
-            if quiet {
-                args.push(CString::new("--quiet").unwrap());
+            for (flag, name) in [
+                (scatac_opts.sam_format, "--sam-format"),
+                (scatac_opts.bed_format, "--bed-format"),
+                (scatac_opts.use_chr, "--use-chr"),
+                (scatac_opts.check_kmer_orphan, "--check-kmer-orphan"),
+                (scatac_opts.struct_constraints, "--struct-constraints"),
+            ] {
+                if flag {
+                    warn!("{} is not supported by piscem-rs and will be ignored", name);
+                }
             }
 
-            info!("cmd: {:?}", args);
-            let arg_ptrs: Vec<*const c_char> = args.iter().map(|s| s.as_ptr()).collect();
-            let args_len: c_int = args.len() as c_int;
-
-            let map_ret = unsafe { run_pesc_sc_atac(args_len, arg_ptrs.as_ptr()) };
-            if map_ret != 0 {
-                bail!("mapper returned exit code {}; failure", map_ret);
-            }
+            let barcode = scatac_opts.barcode.unwrap_or_default();
+            let args = MapScatacArgs {
+                index: PathBuf::from(&scatac_opts.index),
+                reads: scatac_opts.reads.unwrap_or_default().iter().map(PathBuf::from).collect(),
+                read1: scatac_opts.read1.unwrap_or_default().iter().map(PathBuf::from).collect(),
+                read2: scatac_opts.read2.unwrap_or_default().iter().map(PathBuf::from).collect(),
+                barcode: barcode.iter().map(PathBuf::from).collect(),
+                output: scatac_opts.output.clone(),
+                threads: scatac_opts.threads,
+                bc_len: scatac_opts.bclen as usize,
+                no_tn5_shift: scatac_opts.no_tn5_shift,
+                no_poison: scatac_opts.no_poison,
+                check_ambig_hits: !scatac_opts.ignore_ambig_hits,
+                max_ec_card: scatac_opts.max_ec_card,
+                max_hit_occ: scatac_opts.max_hit_occ as usize,
+                max_hit_occ_recover: scatac_opts.max_hit_occ_recover as usize,
+                max_read_occ: scatac_opts.max_read_occ as usize,
+                end_cache_capacity: scatac_opts.end_cache_capacity,
+                bin_size: scatac_opts.bin_size as u64,
+                bin_overlap: scatac_opts.bin_overlap as u64,
+                thr: scatac_opts.thr,
+                min_overlap: 30,
+                skipping_strategy: None,
+                quiet,
+            };
+            map_scatac::run(args)?;
         }
 
         Commands::MapBulk(bulk_opts) => {
@@ -535,19 +502,27 @@ NOTE: This is a temporary restriction and should be lifted in a future version o
                 );
             }
 
-            let mut args = bulk_opts.as_argv()?;
-
-            if quiet {
-                args.push(CString::new("--quiet").unwrap());
+            if bulk_opts.struct_constraints {
+                warn!("--struct-constraints is not supported by piscem-rs and will be ignored");
             }
 
-            let arg_ptrs: Vec<*const c_char> = args.iter().map(|s| s.as_ptr()).collect();
-            let args_len: c_int = args.len() as c_int;
-
-            let map_ret = unsafe { run_pesc_bulk(args_len, arg_ptrs.as_ptr()) };
-            if map_ret != 0 {
-                bail!("mapper returned exit code {}; failure", map_ret);
-            }
+            let args = MapBulkArgs {
+                index: PathBuf::from(&bulk_opts.index),
+                reads: bulk_opts.reads.unwrap_or_default().iter().map(PathBuf::from).collect(),
+                read1: bulk_opts.read1.unwrap_or_default().iter().map(PathBuf::from).collect(),
+                read2: bulk_opts.read2.unwrap_or_default().iter().map(PathBuf::from).collect(),
+                output: bulk_opts.output.clone(),
+                threads: bulk_opts.threads,
+                skipping_strategy: bulk_opts.skipping_strategy,
+                no_poison: bulk_opts.no_poison,
+                ignore_ambig_hits: bulk_opts.ignore_ambig_hits,
+                max_ec_card: bulk_opts.max_ec_card,
+                max_hit_occ: bulk_opts.max_hit_occ as usize,
+                max_hit_occ_recover: bulk_opts.max_hit_occ_recover as usize,
+                max_read_occ: bulk_opts.max_read_occ as usize,
+                quiet,
+            };
+            map_bulk::run(args)?;
         }
     }
     Ok(())
