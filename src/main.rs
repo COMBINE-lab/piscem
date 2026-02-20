@@ -160,6 +160,17 @@ NOTE: This is a temporary restriction and should be lifted in a future version o
                 }
             }
 
+            // Ensure the parent directory of the output prefix exists.
+            if let Some(parent) = output.parent() {
+                if !parent.as_os_str().is_empty() && !parent.exists() {
+                    std::fs::create_dir_all(parent)?;
+                    info!(
+                        "created output directory {} (did not previously exist)",
+                        parent.display()
+                    );
+                }
+            }
+
             let mut args: Vec<CString> = vec![];
 
             let cf_out = PathBuf::from(output.as_path().to_string_lossy().into_owned() + "_cfish");
