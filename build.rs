@@ -1,6 +1,5 @@
 use cmake::Config;
 use std::env;
-use std::path::PathBuf;
 
 fn main() {
     let custom_cc = env::var("CC");
@@ -20,23 +19,6 @@ fn main() {
 
     println!("cargo:rerun-if-changed=cuttlefish/CMakeLists.txt");
     println!("cargo:rerun-if-env-changed=ZLIB_NG_PATH");
-
-    // Cuttlefish's CMake ExternalProject clones KMC into the source tree
-    // (cuttlefish/external/KMC) but tracks completion via stamp files in
-    // the build directory (OUT_DIR/build/...). When cargo assigns a new
-    // build hash (e.g. after `cargo update`), the stamp files are lost
-    // but the cloned KMC directory persists, causing `git clone` to fail
-    // with "destination path 'KMC' already exists". Detect this stale
-    // state and remove the old clone so the fresh build can succeed.
-    let kmc_src_dir = PathBuf::from("cuttlefish/external/KMC");
-    if kmc_src_dir.exists() {
-        let out_dir = env::var("OUT_DIR").unwrap();
-        let cmake_cache = PathBuf::from(&out_dir).join("build/CMakeCache.txt");
-        if !cmake_cache.exists() {
-            eprintln!("Removing stale KMC clone from previous build...");
-            let _ = std::fs::remove_dir_all(&kmc_src_dir);
-        }
-    }
 
     let mut cfg_cf = Box::new(Config::new("cuttlefish"));
 
