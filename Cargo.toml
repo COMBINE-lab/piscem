@@ -1,3 +1,5 @@
+[workspace]
+
 [package]
 name = "piscem"
 version = "0.14.6"

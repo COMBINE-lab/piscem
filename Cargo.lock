@@ -1485,7 +1485,7 @@ dependencies = [
 [[package]]
 name = "piscem-rs"
 version = "0.1.0"
-source = "git+https://github.com/COMBINE-lab/piscem-rs.git?branch=main#5841d910569bbbb56462079422e3cd49c1bf02b0"
+source = "git+https://github.com/COMBINE-lab/piscem-rs.git?branch=main#ecd07f15da49b383ef6c65ad6cf3dca700e394b7"
 dependencies = [
  "ahash",
  "anyhow",
@@ -1903,7 +1903,7 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "sshash-lib"
-version = "0.3.0"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "epserde",

@@ -362,24 +362,28 @@ pub(crate) struct MapSCAtacOpts {
     #[arg(long)]
     pub no_poison: bool,
 
-    /// apply structural constraints when performing mapping.
-    #[arg(short = 'c', long)]
+    /// [DEPRECATED] apply structural constraints when performing mapping.
+    /// This option is no longer supported and will be ignored.
+    #[arg(short = 'c', long, hide = true)]
     pub struct_constraints: bool,
 
     /// the skipping strategy to use for k-mer collection
     #[arg(long, default_value = &DefaultParams::SKIPPING_STRATEGY, value_parser = clap::builder::PossibleValuesParser::new(["permissive", "strict"]))]
     pub skipping_strategy: String,
 
-    /// output mappings in sam format
-    #[arg(long)]
+    /// [DEPRECATED] output mappings in sam format.
+    /// This option is no longer supported and will be ignored.
+    #[arg(long, hide = true)]
     pub sam_format: bool,
 
-    /// output mappings in bed format
-    #[arg(long)]
+    /// [DEPRECATED] output mappings in bed format.
+    /// This option is no longer supported and will be ignored.
+    #[arg(long, hide = true)]
     pub bed_format: bool,
 
-    /// use chromosomes as color
-    #[arg(long)]
+    /// [DEPRECATED] use chromosomes as color.
+    /// This option is no longer supported and will be ignored.
+    #[arg(long, hide = true)]
     pub use_chr: bool,
 
     /// threshold to be considered for pseudoalignment, default set to 0.7
@@ -398,10 +402,10 @@ pub(crate) struct MapSCAtacOpts {
     #[arg(long)]
     pub no_tn5_shift: bool,
 
-    /// Check if any mapping kmer exist for a mate which is not mapped,
+    /// [DEPRECATED] Check if any mapping kmer exist for a mate which is not mapped,
     /// but there exists mapping for the other read.
-    /// If set to true and a mapping kmer exists, then the pair would not be mapped (default false)
-    #[arg(long)]
+    /// This option is no longer supported and will be ignored.
+    #[arg(long, hide = true)]
     pub check_kmer_orphan: bool,
 
     /// determines the maximum cardinality equivalence class

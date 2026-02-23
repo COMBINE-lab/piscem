@@ -419,10 +419,6 @@ NOTE: This is a temporary restriction and should be lifted in a future version o
                 );
             }
 
-            if sc_opts.struct_constraints {
-                warn!("--struct-constraints is not supported by piscem-rs and will be ignored");
-            }
-
             let args = MapScrnaArgs {
                 index: PathBuf::from(&sc_opts.index),
                 read1: sc_opts.read1.iter().map(PathBuf::from).collect(),
@@ -432,6 +428,7 @@ NOTE: This is a temporary restriction and should be lifted in a future version o
                 threads: sc_opts.threads,
                 skipping_strategy: sc_opts.skipping_strategy,
                 no_poison: sc_opts.no_poison,
+                struct_constraints: sc_opts.struct_constraints,
                 ignore_ambig_hits: sc_opts.ignore_ambig_hits,
                 max_ec_card: sc_opts.max_ec_card,
                 max_hit_occ: sc_opts.max_hit_occ as usize,
@@ -513,10 +510,6 @@ NOTE: This is a temporary restriction and should be lifted in a future version o
                 );
             }
 
-            if bulk_opts.struct_constraints {
-                warn!("--struct-constraints is not supported by piscem-rs and will be ignored");
-            }
-
             let args = MapBulkArgs {
                 index: PathBuf::from(&bulk_opts.index),
                 reads: bulk_opts.reads.unwrap_or_default().iter().map(PathBuf::from).collect(),
@@ -526,6 +519,7 @@ NOTE: This is a temporary restriction and should be lifted in a future version o
                 threads: bulk_opts.threads,
                 skipping_strategy: bulk_opts.skipping_strategy,
                 no_poison: bulk_opts.no_poison,
+                struct_constraints: bulk_opts.struct_constraints,
                 ignore_ambig_hits: bulk_opts.ignore_ambig_hits,
                 max_ec_card: bulk_opts.max_ec_card,
                 max_hit_occ: bulk_opts.max_hit_occ as usize,
