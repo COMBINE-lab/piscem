@@ -20,9 +20,17 @@ fn main() {
     println!("cargo:rerun-if-changed=cuttlefish/CMakeLists.txt");
     println!("cargo:rerun-if-env-changed=ZLIB_NG_PATH");
 
-    // Cuttlefish version (git commit hash) — embedded at compile time
-    // and used in the _ver.json output file.
-    println!("cargo:rustc-env=cuttlefish-ver=e24249cfd4566ad74ec02870af5c0a7069f738e2");
+    // Embed the cuttlefish submodule commit hash at compile time.
+    // Re-run build.rs whenever the submodule ref changes.
+    println!("cargo:rerun-if-changed=.git/modules/cuttlefish/HEAD");
+    let cuttlefish_ver = std::process::Command::new("git")
+        .args(["-C", "cuttlefish", "rev-parse", "HEAD"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+    println!("cargo:rustc-env=cuttlefish-ver={cuttlefish_ver}");
 
     let mut cfg_cf = Box::new(Config::new("cuttlefish"));
 
