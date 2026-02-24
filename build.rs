@@ -20,6 +20,10 @@ fn main() {
     println!("cargo:rerun-if-changed=cuttlefish/CMakeLists.txt");
     println!("cargo:rerun-if-env-changed=ZLIB_NG_PATH");
 
+    // Cuttlefish version (git commit hash) — embedded at compile time
+    // and used in the _ver.json output file.
+    println!("cargo:rustc-env=cuttlefish-ver=e24249cfd4566ad74ec02870af5c0a7069f738e2");
+
     let mut cfg_cf = Box::new(Config::new("cuttlefish"));
 
     (*cfg_cf).define("INSTANCE_COUNT", "32");
