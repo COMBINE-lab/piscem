@@ -1,8 +1,7 @@
 [submodule "cuttlefish"]
 	path = cuttlefish
 	url = https://github.com/COMBINE-lab/cuttlefish.git
-	branch = develop
-[submodule "piscem-cpp"]
-	path = piscem-cpp
-	url = https://github.com/COMBINE-lab/piscem-cpp
-	branch = dev-pos
+	branch = cf1-for-piscem
+[submodule "zlib-ng"]
+	path = zlib-ng
+	url = https://github.com/zlib-ng/zlib-ng.git

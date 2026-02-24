@@ -5,6 +5,8 @@
 Notes
 =====
 
+ - If checking out the source code from the GitHub repository, make sure that you do a recursive checkout (i.e. `git clone --recursive https://github.com/COMBINE-lab/piscem`) 
+
  - If you are primarily interested in simply *using* `piscem`, you can obtain pre-compiled binaries from the GitHub [releases](https://github.com/COMBINE-lab/piscem/releases/tag/v0.10.3) page
 for linux x86-64, OSX x86-64, and OSX ARM. Likewise, `piscem` can be installed using [bioconda](https://bioconda.github.io/recipes/piscem/README.html).  The instructions below are 
 primarily for those who need to *build* `piscem` from source.

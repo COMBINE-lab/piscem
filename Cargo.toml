@@ -1,3 +1,5 @@
+[workspace]
+
 [package]
 name = "piscem"
 version = "0.14.6"
@@ -7,10 +9,12 @@ repository = "https://github.com/COMBINE-lab/piscem"
 
 [build-dependencies]
 cmake = "0.1.57"
+pkg-config = "0.3.32"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+piscem-rs = "0.1.0"
 num_cpus = "1.17.0"
 anyhow = "1.0.100"
 clap = { version = "4.5.56", features = [
