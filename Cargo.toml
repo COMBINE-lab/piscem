@@ -5,7 +5,13 @@ name = "piscem"
 version = "0.16.0"
 edition = "2024"
 build = "build.rs"
+license = "BSD-3-Clause"
+description = "Fast, space-efficient k-mer-based read mapper for bulk RNA-seq, scRNA-seq, and scATAC-seq"
 repository = "https://github.com/COMBINE-lab/piscem"
+homepage = "https://github.com/COMBINE-lab/piscem"
+readme = "README.md"
+keywords = ["bioinformatics", "genomics", "rna-seq", "mapping", "kmer"]
+categories = ["command-line-utilities", "science"]
 
 [build-dependencies]
 toml = "0.8"
