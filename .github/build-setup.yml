@@ -1,0 +1,5 @@
+- name: Use portable Cargo config for CI builds
+  shell: bash
+  run: |
+    set -euo pipefail
+    cp .cargo/config-portable.toml .cargo/config.toml
