@@ -9,3 +9,6 @@ rustflags = ["-C", "target-cpu=neoverse-n1"]
 
 [target.aarch64-apple-darwin]
 rustflags = ["-C", "target-cpu=apple-a14"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "target-cpu=x86-64-v3"]
