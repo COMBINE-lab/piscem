@@ -2256,6 +2256,8 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 [[package]]
 name = "sshash-lib"
 version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "039dc737f1a77996eed29e365acab03bf2b17c0277fb27b845dca4b6aaa1ba4f"
 dependencies = [
  "anyhow",
  "epserde 0.12.2",
@@ -3340,8 +3342,3 @@ dependencies = [
  "cc",
  "pkg-config",
 ]
-
-[[patch.unused]]
-name = "libradicl"
-version = "0.11.0"
-source = "git+https://github.com/COMBINE-lab/libradicl.git?branch=develop#5a2f8e8aa6973debaad40748d2b9f19ac1a4b6ce"

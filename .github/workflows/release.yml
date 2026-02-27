@@ -137,6 +137,14 @@ jobs:
       - name: Install dependencies
         run: |
           ${{ matrix.packages_install }}
+      # use the portable config
+      - name: Use portable Cargo config for CI builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .cargo
+          cp .cargo/config-portable.toml .cargo/config.toml
+          echo "Using .cargo/config.toml = config-portable.toml"
       - name: Build artifacts
         run: |
           # Actually do builds and make zips and whatnot
@@ -176,6 +184,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      # use the portable config
+      - name: Use portable Cargo config for CI builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .cargo/config-portable.toml .cargo/config.toml
+
       - name: Install cached dist
         uses: actions/download-artifact@v4
         with:
