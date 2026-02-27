@@ -10,4 +10,4 @@ Cargo.lock
 **/*.rs.bk
 
 # Local cargo config (contains dev-only [patch] overrides)
-.cargo/config.toml
+# .cargo/config.toml

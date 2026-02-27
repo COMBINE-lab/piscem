@@ -1,0 +1,4 @@
+# taken from https://curiouscoding.nl/posts/release-flow/#avx2
+[build]
+# By default, we want maximum performance rather than portability.
+rustflags = ["-C", "target-cpu=native"]

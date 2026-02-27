@@ -22,14 +22,11 @@ install-path = "CARGO_HOME"
 # debug = true
 # split-debuginfo = "packed"
 
-github-build-setup = 'cmake-setup.yml'
-
 [[dist.extra-artifacts]]
 artifacts = ["source-full.tar.gz", "source-full.tar.gz.sha256"]
 build = ["bash", "-c", """
   set -e
-  python3 -m pip install --quiet git-archive-all
-  git-archive-all --force-submodules --prefix=piscem/ source-full.tar.gz
+  git archive --format=tar.gz --prefix=piscem/ HEAD > source-full.tar.gz
   shasum -a 256 source-full.tar.gz > source-full.tar.gz.sha256
   """]
 
@@ -37,17 +34,5 @@ build = ["bash", "-c", """
 aarch64-apple-darwin = "macos-14"
 
 [dist.dependencies.homebrew]
-autoconf = { version = "2.72", stage = [
-  "build",
-  "run",
-], targets = [
-  "aarch64-apple-darwin",
-] }
-automake = { version = "1.16.5", stage = [
-  "build",
-  "run",
-], targets = [
-  "aarch64-apple-darwin",
-] }
 coreutils = { stage = ["build"] }
 gnu-tar = { stage = ["build"] }
