@@ -11,3 +11,11 @@ Cargo.lock
 
 # Local cargo config (contains dev-only [patch] overrides)
 # .cargo/config.toml
+radtk/
+gencode_v49/
+gencode_v49_new/
+piscem-cpp/
+sshash/
+sample_quant_new/
+sample_quant/
+

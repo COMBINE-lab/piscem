@@ -12,7 +12,7 @@ toml = "0.8"
 
 [dependencies]
 piscem-rs = "0.1.0"
-cf1-rs = "0.2.0"
+cf1-rs = "0.3.1"
 num_cpus = "1.17.0"
 anyhow = "1.0.100"
 clap = { version = "4.5.56", features = [
