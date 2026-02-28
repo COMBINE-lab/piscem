@@ -3,3 +3,14 @@
   run: |
     set -euo pipefail
     cp .cargo/config-portable.toml .cargo/config.toml
+
+- name: Debug rustflags/cfg (x86_64)
+  shell: bash
+  run: |
+    set -euo pipefail
+    echo "=== .cargo/config.toml ==="
+    sed -n '1,200p' .cargo/config.toml
+    echo "=== rustc -Vv ==="
+    rustc -Vv
+    echo "=== compile check (shows rustc invocations) ==="
+    cargo build -vv --locked --target x86_64-apple-darwin
