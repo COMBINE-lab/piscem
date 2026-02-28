@@ -132,6 +132,18 @@ jobs:
           set -euo pipefail
           cp .cargo/config-portable.toml .cargo/config.toml
         shell: "bash"
+      - name: "Verify runner CPU + AVX2 visibility"
+        run: |
+          set -euo pipefail
+          uname -m
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            lscpu | egrep -i 'Model name|Flags'
+            lscpu | grep -qi avx2
+          else
+            sysctl -n machdep.cpu.brand_string || true
+            sysctl -n machdep.cpu.features | grep -q AVX2
+          fi
+        shell: "bash"
       - name: "Force AVX2 for x86_64"
         run: |
           set -euo pipefail
