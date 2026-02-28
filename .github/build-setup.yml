@@ -4,7 +4,8 @@
     set -euo pipefail
     cp .cargo/config-portable.toml .cargo/config.toml
 
-- name: Verify runner CPU + AVX2 visibility
+- name: Verify runner AVX2 visibility (x86_64 only)
+  if: contains(join(matrix.targets, ','), 'x86_64-')
   shell: bash
   run: |
     set -euo pipefail
@@ -14,12 +15,25 @@
       lscpu | grep -qi avx2
     else
       sysctl -n machdep.cpu.brand_string || true
-      sysctl -n machdep.cpu.features | grep -q AVX2
+      (sysctl -n machdep.cpu.features 2>/dev/null; sysctl -n machdep.cpu.leaf7_features 2>/dev/null) \
+        | tr ' ' '\n' | grep -q AVX2
     fi
 
-- name: Force AVX2 for x86_64
+- name: Force AVX2 for x86_64 targets
+  if: contains(join(matrix.targets, ','), 'x86_64-')
   shell: bash
   run: |
     set -euo pipefail
     echo 'CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS=-C target-cpu=x86-64-v3 -C target-feature=+avx2' >> "$GITHUB_ENV"
     echo 'CARGO_TARGET_X86_64_APPLE_DARWIN_RUSTFLAGS=-C target-cpu=x86-64-v3 -C target-feature=+avx2' >> "$GITHUB_ENV"
+
+- name: Confirm rustc sees AVX2 cfg (x86_64 only)
+  if: contains(join(matrix.targets, ','), 'x86_64-')
+  shell: bash
+  run: |
+    set -euo pipefail
+    if [[ "$RUNNER_OS" == "Linux" ]]; then
+      rustc --print cfg --target x86_64-unknown-linux-gnu | grep 'target_feature="avx2"'
+    else
+      rustc --print cfg --target x86_64-apple-darwin | grep 'target_feature="avx2"'
+    fi
