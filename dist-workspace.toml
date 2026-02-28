@@ -33,6 +33,7 @@ build = ["bash", "-c", """
 
 [dist.github-custom-runners]
 aarch64-apple-darwin = "macos-14"
+x86_64-apple-darwin = "macos-15-intel"
 
 [dist.dependencies.homebrew]
 coreutils = { stage = ["build"] }
