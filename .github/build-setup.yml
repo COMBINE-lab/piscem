@@ -3,3 +3,10 @@
   run: |
     set -euo pipefail
     cp .cargo/config-portable.toml .cargo/config.toml
+
+- name: Force AVX2 for x86_64
+  shell: bash
+  run: |
+    set -euo pipefail
+    echo 'CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS=-C target-cpu=x86-64-v3 -C target-feature=+avx2' >> "$GITHUB_ENV"
+    echo 'CARGO_TARGET_X86_64_APPLE_DARWIN_RUSTFLAGS=-C target-cpu=x86-64-v3 -C target-feature=+avx2' >> "$GITHUB_ENV"
