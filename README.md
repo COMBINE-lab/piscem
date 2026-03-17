@@ -1,11 +1,11 @@
 # piscem
 
-`piscem` is a rust wrapper for a next-generation index + mapper tool (still currently written in C++17).
+`piscem` is a rust wrapper for a next-generation index + mapper tool consisting of a compacted de Bruijn graph constructor (with tiling information), and a very efficient index and read mapper.
 
 Notes
 =====
 
- - If you are primarily interested in simply *using* `piscem`, you can obtain pre-compiled binaries from the GitHub [releases](https://github.com/COMBINE-lab/piscem/releases/tag/v0.10.3) page
+ - If you are primarily interested in simply *using* `piscem`, you can obtain pre-compiled binaries from the GitHub [releases](https://github.com/COMBINE-lab/piscem/releases/tag/v0.16.2) page
 for linux x86-64, OSX x86-64, and OSX ARM. Likewise, `piscem` can be installed using [bioconda](https://bioconda.github.io/recipes/piscem/README.html).  The instructions below are 
 primarily for those who need to *build* `piscem` from source.
 
@@ -22,51 +22,18 @@ before running `piscem`.
 Building
 ========
 
-This repository currently pulls in (as submodules) `piscem-cpp` and `cuttlefish`, and then uses cargo + the cmake crate to build the C++ code.  It then calls out to the main C++ function from `main.rs`.  The idea is that in this framework, code can slowly be migrated from C++ -> Rust in a piecemeal fashion, while the overall top-level repo remains a "rust build".  Importantly, `piscem` unifies and simplifies the other tools, making them runnable via a single executable and providing an improved command line interface.
-
 To build `piscem`, first check out this repository **with recursive dependencies**:
 
 ```
-git clone --recursive https://github.com/COMBINE-lab/piscem.git
-```
-
-if you have accidentally checked out the repo without the `--recursive` flag, you can change into the top-level directory and run:
-
-```
-git submodule update --init --recursive
+git clone https://github.com/COMBINE-lab/piscem.git
 ```
 
 Once you have checked out the repository, you can build `piscem` with 
 
 ```
-cargo build --release
+RUSTFLAGS="-C target-cpu=native" cargo build --release
 ```
 
-It is worth noting that the build process respects the `CC` and `CXX` environment flags, so if you wish to use a specific C++ compiler, you can run:
-
-```
-CC=<path_to_c_compiler> CXX=<path_to_cxx_compiler> cargo build --release
-```
-
-Compling this code requires a C++17 capable compiler, so if your default compiler does not have these capabilities, please be sure to pass the appropriate 
-flags along to `cargo build` with a sufficiently capable compiler.
-
-Other details about building
-----------------------------
-
-The build process requries access to static libraries for both `zlib` and `libbz2`. If these are not in your standard path, you can provide them via the `RUSTFLAGS` option as:
-
-```
-RUSTFLAGS='-L <path_to_directory_with_libraries>' cargo build --release
-```
-
-Finally, on some systems, you may get a strange linking error related to relocatable symbols. In that case, you can pass the `NOPIE` option to the build process as follows:
-
-```
-NOPIE=TRUE cargo build --release
-```
-
-Note that the `CC`, `CXX`, `RUSTFLAGS` and `NOPIE` environment variables are all "stackable" and you can provide any subset of them that you need during build.
 
 Usage
 =====
@@ -95,9 +62,6 @@ Info for different sub-commands
 
 build
 -----
-
-> **Note**
-> Since the build process makes use of [KMC3](https://github.com/refresh-bio/KMC) for a k-mer enumeration step, which, in turn, makes use of intermediate files to keep memory usage low, **you will likely need to increase the default number of file handles that can be open at once**.  Before running the `build` command, you can do this by running `ulimit -n 2048` in the terminal where you execute the `build` command.  You can also put this command in any script that you will use to run `piscem build`, or add it to your shell initalization scripts / profiles so that it is the default for new shells that you start
 
 The build subcommand indexes one or more reference sequences, building a piscem index over them. The usage for the command is as so:
 
