@@ -17,7 +17,7 @@ categories = ["command-line-utilities", "science"]
 toml = "0.8"
 
 [dependencies]
-piscem-rs = { path = "../piscem-rs", version = "0.2.1" }
+piscem-rs = "0.2.1"
 cf1-rs = "0.3.1"
 num_cpus = "1.17.0"
 anyhow = "1.0.102"

@@ -10,7 +10,7 @@ Cargo.lock
 **/*.rs.bk
 
 # Local cargo config (contains dev-only [patch] overrides)
-# .cargo/config.toml
+.cargo/config.local.toml
 radtk/
 gencode_v49/
 gencode_v49_new/
@@ -18,4 +18,3 @@ piscem-cpp/
 sshash/
 sample_quant_new/
 sample_quant/
-
