@@ -9,10 +9,11 @@ die() {
 usage() {
     cat <<'EOF'
 Usage:
-  ./bump_and_publish.sh <version> [--dry-run]
-  ./bump_and_publish.sh [--dry-run] <version>
+  ./bump_and_publish.sh <version> [--publish] [--dry-run]
+  ./bump_and_publish.sh [--publish] [--dry-run] <version>
 
 Options:
+  --publish  Publish to crates.io after bumping, committing, tagging, and pushing
   --dry-run  Show what would be done without modifying tracked files, creating commits or tags, pushing, or publishing
   -h, --help Show this help message
 EOF
@@ -33,10 +34,14 @@ run() {
 }
 
 VERSION=""
+PUBLISH=false
 DRY_RUN=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --publish)
+            PUBLISH=true
+            ;;
         --dry-run)
             DRY_RUN=true
             ;;
@@ -133,6 +138,11 @@ fi
 echo "Current crate version : $CURRENT_VERSION"
 echo "New crate version     : $VERSION"
 echo "Tag                   : $TAG"
+if [[ "$PUBLISH" == true ]]; then
+    echo "Publish               : yes"
+else
+    echo "Publish               : no"
+fi
 if [[ "$DRY_RUN" == true ]]; then
     echo "Dry-run               : yes"
 else
@@ -198,10 +208,15 @@ if [[ "$DRY_RUN" == false ]]; then
     COMMIT_CREATED=true
 fi
 
-run cargo publish
 run git tag -a "$TAG" -m "Release ${VERSION}"
 run git push origin HEAD
 run git push origin "$TAG"
+
+if [[ "$PUBLISH" == true ]]; then
+    run cargo publish
+else
+    echo "Skipping crates.io publish; re-run with --publish to publish ${CRATE_NAME} v${VERSION}"
+fi
 
 echo
 if [[ "$DRY_RUN" == true ]]; then
