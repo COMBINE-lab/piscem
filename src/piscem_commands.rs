@@ -1,5 +1,6 @@
 use anyhow::{Result, anyhow, bail};
 use clap::{ArgGroup, Args};
+use piscem_rs::cli::DictKind;
 use std::path::PathBuf;
 
 trait DefaultMappingParams {
@@ -122,6 +123,10 @@ pub(crate) struct BuildOpts {
         default_value_t = 1
     )]
     pub seed: u64,
+
+    /// dictionary artifacts to emit: `auto` (default), `sshash`, or `tiny`.
+    #[arg(long, value_enum, default_value_t = DictKind::Auto, help_heading = "Index Construction Parameters")]
+    pub dict: DictKind,
 }
 
 #[derive(Args, Clone, Debug)]
@@ -211,6 +216,10 @@ pub(crate) struct MapSCOpts {
     /// their mappings reported.
     #[arg(long, default_value_t = DefaultParams::MAX_READ_OCC, help_heading = "Advanced options")]
     pub max_read_occ: u32,
+
+    /// dictionary backend: `auto` (default), `sshash`, or `tiny`.
+    #[arg(long, value_enum, default_value_t = DictKind::Auto, help_heading = "Advanced options")]
+    pub dict: DictKind,
 }
 
 #[derive(Args, Clone, Debug)]
@@ -301,6 +310,10 @@ pub(crate) struct MapBulkOpts {
     /// their mappings reported.
     #[arg(long, default_value_t = DefaultParams::MAX_READ_OCC, help_heading = "Advanced options")]
     pub max_read_occ: u32,
+
+    /// dictionary backend: `auto` (default), `sshash`, or `tiny`.
+    #[arg(long, value_enum, default_value_t = DictKind::Auto, help_heading = "Advanced options")]
+    pub dict: DictKind,
 }
 
 
@@ -441,4 +454,8 @@ pub(crate) struct MapSCAtacOpts {
     /// the capacity of the cache used to provide fast lookup for k-mers at the ends of unitigs
     #[arg(long, default_value_t = DefaultParams::END_CACHE_CAPACITY, help_heading = "Advanced options")]
     pub end_cache_capacity: usize,
+
+    /// dictionary backend: `auto` (default), `sshash`, or `tiny`.
+    #[arg(long, value_enum, default_value_t = DictKind::Auto, help_heading = "Advanced options")]
+    pub dict: DictKind,
 }

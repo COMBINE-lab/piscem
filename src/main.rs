@@ -90,6 +90,7 @@ fn main() -> Result<(), anyhow::Error> {
             polya_clip_length,
             decoy_paths,
             seed,
+            dict,
         }) => {
             info!("starting piscem build");
             if threads == 0 {
@@ -298,6 +299,7 @@ fn main() -> Result<(), anyhow::Error> {
                 canonical: true,
                 seed,
                 single_mphf: false,
+                dict,
             })?;
 
             // Build poison table if decoys were provided
@@ -375,6 +377,7 @@ fn main() -> Result<(), anyhow::Error> {
                 max_read_occ: sc_opts.max_read_occ as usize,
                 with_position: sc_opts.with_position,
                 quiet,
+                dict: sc_opts.dict,
             };
             map_scrna::run(args)?;
         }
@@ -430,6 +433,7 @@ fn main() -> Result<(), anyhow::Error> {
                 min_overlap: 30,
                 skipping_strategy: None,
                 quiet,
+                dict: scatac_opts.dict,
             };
             map_scatac::run(args)?;
         }
@@ -465,6 +469,7 @@ fn main() -> Result<(), anyhow::Error> {
                 max_hit_occ_recover: bulk_opts.max_hit_occ_recover as usize,
                 max_read_occ: bulk_opts.max_read_occ as usize,
                 quiet,
+                dict: bulk_opts.dict,
             };
             map_bulk::run(args)?;
         }

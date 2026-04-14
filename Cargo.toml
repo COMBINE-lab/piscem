@@ -30,6 +30,11 @@ prepare_fasta = { version = "0.2.0" }
 serde_json = "1.0.149"
 mimalloc = "0.1"
 
+[patch.crates-io]
+piscem-rs = { path = "../piscem-rs" }
+sshash-lib = { path = "../sshash-rs/crates/sshash-lib" }
+tiny-dict = { path = "../sshash-rs/crates/tiny-dict" }
+
 [profile.release]
 lto = "thin"
 opt-level = 3
