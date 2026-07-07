@@ -1716,9 +1716,9 @@ dependencies = [
 
 [[package]]
 name = "piscem-rs"
-version = "0.5.0"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af20f2f1903686f8f9553e83742267a3de6aab779781cfdab0e90cafe6a2ee83"
+checksum = "4e201a591763baf9e1359c130c3682328101070bfb35919f6f0f21e5db8ef509"
 dependencies = [
  "ahash",
  "anyhow",
@@ -2275,9 +2275,9 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "sshash-lib"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b29fe9ec9a93a3c9f522a229f6e16895e05c067d67a4fa173dafc197bcced133"
+checksum = "a4c8193a26ce11a96554762dc3347b82659e659591b60ff9f63bc000c03221ad"
 dependencies = [
  "anyhow",
  "epserde",
