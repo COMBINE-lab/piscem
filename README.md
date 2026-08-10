@@ -120,6 +120,12 @@ references in the index given the mapped reads.
 
 Reads are given either as paired `-1`/`-2` lists or as a single `--reads` list.
 
+> **Note**
+> For `map-bulk`, `-o` is an output **file stem**, not a directory:
+> `-o some/dir/sample` writes `some/dir/sample.rad` and
+> `some/dir/sample.map_info.json`. This differs from `map-sc` and
+> `map-sc-atac`, where `-o` names a directory that `map.rad` is written into.
+
 map-sc-atac
 -----------
 

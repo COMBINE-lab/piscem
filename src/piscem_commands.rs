@@ -316,7 +316,9 @@ pub(crate) struct MapBulkOpts {
     #[command(flatten)]
     pub decode: DecoderOpts,
 
-    /// path to output directory
+    /// output file stem, NOT a directory: `-o some/dir/sample` writes
+    /// `some/dir/sample.rad` and `some/dir/sample.map_info.json`. Note this
+    /// differs from `map-sc` and `map-sc-atac`, whose `-o` names a directory.
     #[arg(short, long)]
     pub output: PathBuf,
 
