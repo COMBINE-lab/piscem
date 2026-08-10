@@ -17,9 +17,14 @@ categories = ["command-line-utilities", "science"]
 toml = "0.8"
 
 [dependencies]
-piscem-rs = "0.6.3"
-cf1-rs = "0.5.0"
-num_cpus = "1.17.0"
+# `rapidgzip` is not a default feature of piscem-rs; without it the parallel
+# gzip decoder is not compiled in and `--decoder` silently does nothing.
+# `default-features = false` drops piscem-rs's `mimalloc` feature, which only
+# installs a #[global_allocator] in piscem-rs's own binary — we install ours.
+piscem-rs = { version = "0.9.1", default-features = false, features = [
+  "rapidgzip",
+] }
+cf1-rs = "0.5.1"
 anyhow = "1.0"
 clap = { version = "4.6", features = ["cargo", "derive", "env", "wrap_help"] }
 tracing = "0.1"

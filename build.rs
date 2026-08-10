@@ -1,7 +1,6 @@
 fn main() {
     // Extract cf1-rs version from Cargo.lock so we can embed it in the version JSON.
-    let lock_contents =
-        std::fs::read_to_string("Cargo.lock").expect("Failed to read Cargo.lock");
+    let lock_contents = std::fs::read_to_string("Cargo.lock").expect("Failed to read Cargo.lock");
     let lock: toml::Value = lock_contents.parse().expect("Failed to parse Cargo.lock");
     let version = lock["package"]
         .as_array()

@@ -15,15 +15,15 @@ mod piscem_commands;
 use piscem_commands::*;
 
 use piscem_rs::cli::build as rs_build;
-use piscem_rs::cli::poison as rs_poison;
-use piscem_rs::cli::map_bulk;
-use piscem_rs::cli::map_scrna;
-use piscem_rs::cli::map_scatac;
 use piscem_rs::cli::build::BuildArgs;
-use piscem_rs::cli::poison::BuildPoisonArgs;
-use piscem_rs::cli::map_scrna::MapScrnaArgs;
+use piscem_rs::cli::map_bulk;
 use piscem_rs::cli::map_bulk::MapBulkArgs;
+use piscem_rs::cli::map_scatac;
 use piscem_rs::cli::map_scatac::MapScatacArgs;
+use piscem_rs::cli::map_scrna;
+use piscem_rs::cli::map_scrna::MapScrnaArgs;
+use piscem_rs::cli::poison as rs_poison;
+use piscem_rs::cli::poison::BuildPoisonArgs;
 
 /// Indexing and mapping to compacted colored de Bruijn graphs
 #[derive(Debug, Parser)]
@@ -56,6 +56,28 @@ enum Commands {
     MapSCAtac(MapSCAtacOpts),
 }
 
+/// Validate a requested thread count against the parallelism actually available.
+///
+/// Zero is an error, but over-requesting is only a warning: piscem-rs caps the
+/// effective budget itself and records both the requested and effective values
+/// in `map_info.json`, so refusing outright would reject runs that work fine.
+fn check_threads(threads: usize, ncpus: usize) -> Result<()> {
+    if threads == 0 {
+        bail!(
+            "the number of provided threads ({}) must be greater than 0.",
+            threads
+        );
+    }
+    if threads > ncpus {
+        warn!(
+            "the number of provided threads ({}) exceeds the available parallelism ({}); \
+             the effective budget will be {}.",
+            threads, ncpus, ncpus
+        );
+    }
+    Ok(())
+}
+
 fn main() -> Result<(), anyhow::Error> {
     let cli_args = Cli::parse();
 
@@ -72,7 +94,11 @@ fn main() -> Result<(), anyhow::Error> {
             .init();
     }
 
-    let ncpus = num_cpus::get();
+    // `available_parallelism` honours cpuset/cgroup limits, which
+    // `num_cpus::get()` does not; piscem-rs caps the effective budget the same
+    // way, so agreeing here keeps the wrapper from accepting a number that gets
+    // silently clamped one layer down.
+    let ncpus = std::thread::available_parallelism().map_or(1, |n| n.get());
 
     match cli_args.command {
         Commands::Build(BuildOpts {
@@ -91,21 +117,11 @@ fn main() -> Result<(), anyhow::Error> {
             decoy_paths,
             seed,
             dict,
+            tmp_dir,
+            ram_limit_gib,
         }) => {
             info!("starting piscem build");
-            if threads == 0 {
-                bail!(
-                    "the number of provided threads ({}) must be greater than 0.",
-                    threads
-                );
-            }
-            if threads > ncpus {
-                bail!(
-                    "the number of provided threads ({}) should be <= the number of logical CPUs ({}).",
-                    threads,
-                    ncpus
-                );
-            }
+            check_threads(threads, ncpus)?;
             if mlen >= klen {
                 bail!(
                     "minimizer length ({}) must be < k-mer length ({})",
@@ -137,14 +153,15 @@ fn main() -> Result<(), anyhow::Error> {
             }
 
             // Ensure the parent directory of the output prefix exists.
-            if let Some(parent) = output.parent() {
-                if !parent.as_os_str().is_empty() && !parent.exists() {
-                    std::fs::create_dir_all(parent)?;
-                    info!(
-                        "created output directory {} (did not previously exist)",
-                        parent.display()
-                    );
-                }
+            if let Some(parent) = output.parent()
+                && !parent.as_os_str().is_empty()
+                && !parent.exists()
+            {
+                std::fs::create_dir_all(parent)?;
+                info!(
+                    "created output directory {} (did not previously exist)",
+                    parent.display()
+                );
             }
 
             // Build CfInput from CLI args, using native variants where possible.
@@ -237,23 +254,21 @@ fn main() -> Result<(), anyhow::Error> {
                         work_dir.display()
                     );
                 }
-                Ok(false) => {
-                    match std::fs::create_dir_all(&work_dir) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            error!(
-                                "when attempting to create working directory {}, encountered error {:#?}",
-                                &work_dir.display(),
-                                e
-                            );
-                            bail!(
-                                "Failed to create working directory {} for index construction : {:#?}",
-                                &work_dir.display(),
-                                e
-                            );
-                        }
+                Ok(false) => match std::fs::create_dir_all(&work_dir) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        error!(
+                            "when attempting to create working directory {}, encountered error {:#?}",
+                            &work_dir.display(),
+                            e
+                        );
+                        bail!(
+                            "Failed to create working directory {} for index construction : {:#?}",
+                            work_dir.display(),
+                            e
+                        );
                     }
-                }
+                },
                 Err(e) => {
                     error!("when checking existence of working directory {:#?}", e);
                     bail!(
@@ -264,14 +279,15 @@ fn main() -> Result<(), anyhow::Error> {
             }
 
             // Ensure the output parent directory exists.
-            if let Some(parent_path) = cf_out.parent() {
-                if !parent_path.as_os_str().is_empty() && !parent_path.exists() {
-                    std::fs::create_dir_all(parent_path)?;
-                    info!(
-                        "directory {} did not already exist; creating it.",
-                        parent_path.display()
-                    );
-                }
+            if let Some(parent_path) = cf_out.parent()
+                && !parent_path.as_os_str().is_empty()
+                && !parent_path.exists()
+            {
+                std::fs::create_dir_all(parent_path)?;
+                info!(
+                    "directory {} did not already exist; creating it.",
+                    parent_path.display()
+                );
             }
 
             info!("starting cDBG construction with cf1-rs");
@@ -300,6 +316,8 @@ fn main() -> Result<(), anyhow::Error> {
                 seed,
                 single_mphf: false,
                 dict,
+                tmp_dir,
+                ram_limit_gib,
             })?;
 
             // Build poison table if decoys were provided
@@ -346,19 +364,7 @@ fn main() -> Result<(), anyhow::Error> {
         }
 
         Commands::MapSC(sc_opts) => {
-            if sc_opts.threads == 0 {
-                bail!(
-                    "the number of provided threads ({}) must be greater than 0.",
-                    sc_opts.threads
-                );
-            }
-            if sc_opts.threads > ncpus {
-                bail!(
-                    "the number of provided threads ({}) should be <= the number of logical CPUs ({}).",
-                    sc_opts.threads,
-                    ncpus
-                );
-            }
+            check_threads(sc_opts.threads, ncpus)?;
 
             let args = MapScrnaArgs {
                 index: PathBuf::from(&sc_opts.index),
@@ -367,6 +373,8 @@ fn main() -> Result<(), anyhow::Error> {
                 geometry: sc_opts.geometry,
                 output: sc_opts.output.clone(),
                 threads: sc_opts.threads,
+                decoder: sc_opts.decode.decoder,
+                thread_policy: sc_opts.decode.thread_policy,
                 skipping_strategy: sc_opts.skipping_strategy,
                 no_poison: sc_opts.no_poison,
                 struct_constraints: sc_opts.struct_constraints,
@@ -383,19 +391,7 @@ fn main() -> Result<(), anyhow::Error> {
         }
 
         Commands::MapSCAtac(scatac_opts) => {
-            if scatac_opts.threads == 0 {
-                bail!(
-                    "the number of provided threads ({}) must be greater than 0.",
-                    scatac_opts.threads
-                );
-            }
-            if scatac_opts.threads > ncpus {
-                bail!(
-                    "the number of provided threads ({}) should be <= the number of logical CPUs ({}).",
-                    scatac_opts.threads,
-                    ncpus
-                );
-            }
+            check_threads(scatac_opts.threads, ncpus)?;
 
             for (flag, name) in [
                 (scatac_opts.sam_format, "--sam-format"),
@@ -412,12 +408,29 @@ fn main() -> Result<(), anyhow::Error> {
             let barcode = scatac_opts.barcode.unwrap_or_default();
             let args = MapScatacArgs {
                 index: PathBuf::from(&scatac_opts.index),
-                reads: scatac_opts.reads.unwrap_or_default().iter().map(PathBuf::from).collect(),
-                read1: scatac_opts.read1.unwrap_or_default().iter().map(PathBuf::from).collect(),
-                read2: scatac_opts.read2.unwrap_or_default().iter().map(PathBuf::from).collect(),
+                reads: scatac_opts
+                    .reads
+                    .unwrap_or_default()
+                    .iter()
+                    .map(PathBuf::from)
+                    .collect(),
+                read1: scatac_opts
+                    .read1
+                    .unwrap_or_default()
+                    .iter()
+                    .map(PathBuf::from)
+                    .collect(),
+                read2: scatac_opts
+                    .read2
+                    .unwrap_or_default()
+                    .iter()
+                    .map(PathBuf::from)
+                    .collect(),
                 barcode: barcode.iter().map(PathBuf::from).collect(),
                 output: scatac_opts.output.clone(),
                 threads: scatac_opts.threads,
+                decoder: scatac_opts.decode.decoder,
+                thread_policy: scatac_opts.decode.thread_policy,
                 bc_len: scatac_opts.bclen as usize,
                 no_tn5_shift: scatac_opts.no_tn5_shift,
                 no_poison: scatac_opts.no_poison,
@@ -439,27 +452,32 @@ fn main() -> Result<(), anyhow::Error> {
         }
 
         Commands::MapBulk(bulk_opts) => {
-            if bulk_opts.threads == 0 {
-                bail!(
-                    "the number of provided threads ({}) must be greater than 0.",
-                    bulk_opts.threads
-                );
-            }
-            if bulk_opts.threads > ncpus {
-                bail!(
-                    "the number of provided threads ({}) should be <= the number of logical CPUs ({}).",
-                    bulk_opts.threads,
-                    ncpus
-                );
-            }
+            check_threads(bulk_opts.threads, ncpus)?;
 
             let args = MapBulkArgs {
                 index: PathBuf::from(&bulk_opts.index),
-                reads: bulk_opts.reads.unwrap_or_default().iter().map(PathBuf::from).collect(),
-                read1: bulk_opts.read1.unwrap_or_default().iter().map(PathBuf::from).collect(),
-                read2: bulk_opts.read2.unwrap_or_default().iter().map(PathBuf::from).collect(),
+                reads: bulk_opts
+                    .reads
+                    .unwrap_or_default()
+                    .iter()
+                    .map(PathBuf::from)
+                    .collect(),
+                read1: bulk_opts
+                    .read1
+                    .unwrap_or_default()
+                    .iter()
+                    .map(PathBuf::from)
+                    .collect(),
+                read2: bulk_opts
+                    .read2
+                    .unwrap_or_default()
+                    .iter()
+                    .map(PathBuf::from)
+                    .collect(),
                 output: bulk_opts.output.clone(),
                 threads: bulk_opts.threads,
+                decoder: bulk_opts.decode.decoder,
+                thread_policy: bulk_opts.decode.thread_policy,
                 skipping_strategy: bulk_opts.skipping_strategy,
                 no_poison: bulk_opts.no_poison,
                 struct_constraints: bulk_opts.struct_constraints,

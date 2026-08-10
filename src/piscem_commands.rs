@@ -31,6 +31,43 @@ impl DefaultMappingParams for DefaultParams {
     const END_CACHE_CAPACITY: usize = 5_000_000;
 }
 
+/// Options controlling how the shared `-t` budget is split between mapping and
+/// gzip decoding. Shared by all three mapping subcommands; the help text mirrors
+/// `piscem-rs` so `piscem --help` and `piscem-rs --help` agree.
+#[derive(Args, Clone, Debug)]
+pub(crate) struct DecoderOpts {
+    /// Gzip decoder selection: `auto`, `serial`, `parallel`, or `parallel=N`.
+    ///
+    /// `auto` adapts the aggregate mapping/decode split during the real run.
+    /// `serial` gives mapping the full budget. `parallel` forces the parallel
+    /// path but still adapts its split; `parallel=N` fixes N slots per
+    /// decoder-capable input and disables adaptation. Non-regular inputs remain
+    /// serial because the parallel decoder requires positional reads.
+    #[arg(long, default_value = "auto", value_name = "MODE", value_parser = decoder_is_good)]
+    pub decoder: String,
+
+    /// Path to a JSON file overriding thread and decoder policy.
+    ///
+    /// Every field is optional and defaults to a measured value, so a file need
+    /// only name what it changes; an unknown field is an error rather than a
+    /// silent no-op. Currently:
+    ///
+    /// `{"parallel_decode": {"min_threads_per_stream": 8}}`
+    ///
+    /// That value is how many threads must be available per gzip input before
+    /// the parallel decoder is used at all. Below it the serial decoder already
+    /// supplies one inflate stream per input for free, on threads that also map.
+    #[arg(long, value_name = "FILE")]
+    pub thread_policy: Option<PathBuf>,
+}
+
+/// Reject a malformed `--decoder` at parse time rather than after the index has
+/// been loaded. Defers to piscem-rs's own grammar so the two cannot drift.
+fn decoder_is_good(s: &str) -> Result<String> {
+    piscem_rs::io::calibrate::DecoderPreference::parse(s).map_err(|e| anyhow!("{e}"))?;
+    Ok(s.to_owned())
+}
+
 fn klen_is_good(s: &str) -> Result<usize> {
     let k: usize = s
         .parse()
@@ -127,6 +164,18 @@ pub(crate) struct BuildOpts {
     /// dictionary artifacts to emit: `auto` (default), `sshash`, or `tiny`.
     #[arg(long, value_enum, default_value_t = DictKind::Auto, help_heading = "Index Construction Parameters")]
     pub dict: DictKind,
+
+    /// directory for SSHash's external minimizer-sort scratch files. This is a
+    /// distinct, later phase from the cDBG construction that `--work-dir`
+    /// covers. Unset keeps SSHash's default (`sshash_tmp` in the current
+    /// directory).
+    #[arg(long, help_heading = "Indexing Details")]
+    pub tmp_dir: Option<PathBuf>,
+
+    /// RAM ceiling, in GiB, for SSHash's external minimizer sort. Unset keeps
+    /// SSHash's default (8 GiB); a smaller value spills to disk sooner.
+    #[arg(long, help_heading = "Indexing Details")]
+    pub ram_limit_gib: Option<usize>,
 }
 
 #[derive(Args, Clone, Debug)]
@@ -159,9 +208,12 @@ pub(crate) struct MapSCOpts {
     )]
     pub read2: Vec<String>,
 
-    /// number of threads to use
+    /// total execution-slot budget shared by mapping and gzip decoding
     #[arg(short, long, default_value_t = 16)]
     pub threads: usize,
+
+    #[command(flatten)]
+    pub decode: DecoderOpts,
 
     /// path to output directory
     #[arg(short, long)]
@@ -257,9 +309,12 @@ pub(crate) struct MapBulkOpts {
     #[arg(short = 'r', long, help_heading = "Input", value_delimiter = ',', conflicts_with_all = ["read1", "read2"])]
     pub reads: Option<Vec<String>>,
 
-    /// number of threads to use
+    /// total execution-slot budget shared by mapping and gzip decoding
     #[arg(short, long, default_value_t = 16)]
     pub threads: usize,
+
+    #[command(flatten)]
+    pub decode: DecoderOpts,
 
     /// path to output directory
     #[arg(short, long)]
@@ -316,7 +371,6 @@ pub(crate) struct MapBulkOpts {
     pub dict: DictKind,
 }
 
-
 #[derive(Args, Clone, Debug)]
 pub(crate) struct MapSCAtacOpts {
     /// input index prefix
@@ -347,17 +401,15 @@ pub(crate) struct MapSCAtacOpts {
     pub reads: Option<Vec<String>>,
 
     /// path to a ',' separated list of barcode files
-    #[arg(
-        short = 'b',
-        long,
-        help_heading = "Input",
-        value_delimiter = ','
-    )]
+    #[arg(short = 'b', long, help_heading = "Input", value_delimiter = ',')]
     pub barcode: Option<Vec<String>>,
 
-    /// number of threads to use
+    /// total execution-slot budget shared by mapping and gzip decoding
     #[arg(short, long, default_value_t = 16)]
     pub threads: usize,
+
+    #[command(flatten)]
+    pub decode: DecoderOpts,
 
     /// path to output directory
     #[arg(short, long)]
