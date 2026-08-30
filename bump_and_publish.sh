@@ -9,12 +9,15 @@ die() {
 usage() {
     cat <<'EOF'
 Usage:
-  ./bump_and_publish.sh <version> [--publish] [--dry-run]
+  ./bump_and_publish.sh <version> [--publish] [--dry-run] [--allow-same-version]
   ./bump_and_publish.sh [--publish] [--dry-run] <version>
 
 Options:
   --publish  Publish to crates.io after bumping, committing, tagging, and pushing
   --dry-run  Show what would be done without modifying tracked files, creating commits or tags, pushing, or publishing
+  --allow-same-version  Proceed when the crate is already at <version>
+             (skips the bump edits and bump commit; check/tag/push/publish
+             still run). Use when the version was bumped ahead of release.
   -h, --help Show this help message
 EOF
 }
@@ -36,6 +39,7 @@ run() {
 VERSION=""
 PUBLISH=false
 DRY_RUN=false
+ALLOW_SAME_VERSION=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -44,6 +48,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         --dry-run)
             DRY_RUN=true
+            ;;
+        --allow-same-version)
+            ALLOW_SAME_VERSION=true
             ;;
         -h|--help)
             usage
@@ -119,8 +126,14 @@ trap cleanup EXIT
 CURRENT_VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' "$ROOT_CARGO" | head -1)"
 [[ -n "$CURRENT_VERSION" ]] || die "could not determine current crate version from $ROOT_CARGO"
 
+SAME_VERSION=false
 if [[ "$CURRENT_VERSION" == "$VERSION" ]]; then
-    die "crate version is already $VERSION"
+    if [[ "$ALLOW_SAME_VERSION" == true ]]; then
+        SAME_VERSION=true
+        echo "Crate already at $VERSION; skipping bump edits (--allow-same-version)"
+    else
+        die "crate version is already $VERSION (pass --allow-same-version to release it as-is)"
+    fi
 fi
 
 if git rev-parse "$TAG" >/dev/null 2>&1; then
@@ -162,7 +175,7 @@ echo "  version: $CURRENT_VERSION -> $VERSION"
 echo "Updating $LOCKFILE"
 echo "  package entry version: $CURRENT_VERSION -> $VERSION"
 
-if [[ "$DRY_RUN" == false ]]; then
+if [[ "$DRY_RUN" == false && "$SAME_VERSION" == false ]]; then
     MANIFEST_BACKUP="$(mktemp "${TMPDIR:-/tmp}/piscem-Cargo.toml.XXXXXX")"
     LOCKFILE_BACKUP="$(mktemp "${TMPDIR:-/tmp}/piscem-Cargo.lock.XXXXXX")"
     cp "$ROOT_CARGO" "$MANIFEST_BACKUP"
@@ -181,7 +194,7 @@ fi
 
 UPDATED_VERSION="$CURRENT_VERSION"
 UPDATED_LOCK_VERSION="$CURRENT_VERSION"
-if [[ "$DRY_RUN" == false ]]; then
+if [[ "$DRY_RUN" == false && "$SAME_VERSION" == false ]]; then
     UPDATED_VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' "$ROOT_CARGO" | head -1)"
     UPDATED_LOCK_VERSION="$(sed -n "/^name = \"${CRATE_NAME}\"$/,/^dependencies = \\[$/s/^version = \"\(.*\)\"/\1/p" "$LOCKFILE" | head -1)"
 
@@ -201,8 +214,12 @@ else
     TMP_TARGET_DIR=""
 fi
 
-run git add "$ROOT_CARGO" "$LOCKFILE"
-run git commit -m "chore(release): bump ${CRATE_NAME} to v${VERSION}"
+if [[ "$SAME_VERSION" == false ]]; then
+    run git add "$ROOT_CARGO" "$LOCKFILE"
+    run git commit -m "chore(release): bump ${CRATE_NAME} to v${VERSION}"
+else
+    echo "Skipping bump commit (crate already at v${VERSION})"
+fi
 
 if [[ "$DRY_RUN" == false ]]; then
     COMMIT_CREATED=true
