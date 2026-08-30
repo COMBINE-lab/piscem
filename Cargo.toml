@@ -43,10 +43,3 @@ opt-level = 3
 [profile.dist]
 inherits = "release"
 
-# Local development against the piscem-rs 0.10 / sshash-rs 0.7 branches;
-# removed at release (crates.io gets the published versions).
-[patch.crates-io]
-piscem-rs = { path = "/scratch2/rob/salmon-rewrite/piscem-rs" }
-thread-broker = { path = "/scratch2/rob/salmon-rewrite/piscem-rs/crates/thread-broker" }
-sshash-lib = { path = "/scratch2/rob/salmon-rewrite/sshash-rs/crates/sshash-lib" }
-tiny-dict = { path = "/scratch2/rob/salmon-rewrite/sshash-rs/crates/tiny-dict" }
