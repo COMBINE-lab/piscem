@@ -312,7 +312,9 @@ fn main() -> Result<(), anyhow::Error> {
                 mlen,
                 threads,
                 build_ec_table: !no_ec_table,
-                canonical: true,
+                // Deprecated in piscem-rs 0.10 (the index is always
+                // canonical); false avoids the accept-and-warn notice.
+                canonical: false,
                 seed,
                 single_mphf: false,
                 dict,
