@@ -1,6 +1,7 @@
 use anyhow::{Result, anyhow, bail};
 use clap::{ArgGroup, Args};
 use piscem_rs::cli::DictKind;
+use piscem_rs::cli::build::{MphfArg, OfflineArg};
 use std::path::PathBuf;
 
 trait DefaultMappingParams {
@@ -165,10 +166,23 @@ pub(crate) struct BuildOpts {
     #[arg(long, value_enum, default_value_t = DictKind::Auto, help_heading = "Index Construction Parameters")]
     pub dict: DictKind,
 
-    /// directory for SSHash's external minimizer-sort scratch files. This is a
-    /// distinct, later phase from the cDBG construction that `--work-dir`
-    /// covers. Unset keeps SSHash's default (`sshash_tmp` in the current
-    /// directory).
+    /// how SSHash builds its minimizer MPHF: `streaming` (default; one
+    /// function, built offline in `--tmp-dir` for large references),
+    /// `in-memory` (one function from a copy of the minimizers; no temporary
+    /// disk) or `partitioned` (~3M-key functions in parallel; no temporary
+    /// disk, slower lookups). The index format is the same.
+    #[arg(long, value_enum, default_value_t = MphfArg::Streaming, help_heading = "Index Construction Parameters")]
+    pub mphf: MphfArg,
+
+    /// where `--mphf streaming` keeps its construction records (16 bytes per
+    /// minimizer): `auto` (default) in `--tmp-dir` from 2^24 minimizers on,
+    /// `always` there, `never` in memory.
+    #[arg(long, value_enum, default_value_t = OfflineArg::Auto, help_heading = "Index Construction Parameters")]
+    pub mphf_offline: OfflineArg,
+
+    /// directory for SSHash's temporary files: its external minimizer sort and
+    /// offline MPHF construction, a distinct, later phase from the cDBG
+    /// construction. Unset uses `sshash_tmp` inside `--work-dir`.
     #[arg(long, help_heading = "Indexing Details")]
     pub tmp_dir: Option<PathBuf>,
 

@@ -84,8 +84,15 @@ adds poison k-mer information from the given decoy sequences to the index.
 Two directories are involved, and they are not the same:
 
   - `--work-dir` (default `./workdir.noindex`) holds the temporary files for **cDBG construction**.
-  - `--tmp-dir` holds SSHash's **external minimizer-sort** scratch, a later phase. Unset, SSHash
-    uses `sshash_tmp` in the current directory.
+  - `--tmp-dir` holds SSHash's temporary files, a later phase: its **external minimizer sort** and,
+    for large references, its **offline MPHF construction** (16 bytes per minimizer, about 2.7 GB
+    for a human genome). Unset, they go in `sshash_tmp` inside `--work-dir`.
+
+`--mphf` chooses how SSHash builds its minimizer MPHF: `streaming` (the default; one function,
+built offline in `--tmp-dir` for large references, see `--mphf-offline auto|always|never`),
+`in-memory` (one function from a copy of the minimizers; no temporary disk, more memory) or
+`partitioned` (~3M-key functions built in parallel; no temporary disk, slightly slower lookups).
+The index format, and the mapping results, are the same.
 
 `--ram-limit-gib` caps the RAM that external minimizer sort may use (default 8 GiB); a smaller value
 spills to disk sooner. Both are useful on HPC systems where `/tmp` is small or the job runs under a
@@ -97,6 +104,12 @@ chain so a container limit is respected rather than the host's total.
 > less than or equal to the number of **high performance** cores that you have (rather than the
 > total number of cores including efficiency cores), as using efficiency cores in the `piscem build`
 > step has been observed to severely degrade performance.
+
+> **Note**
+> Since piscem 0.24, mapping output is RAD v2 (self-describing: a `RAD_FILE` magic, a format version
+> and tag roles). Reading it requires a tool built on `libradicl` 0.20 or later: an alevin-fry or
+> piscem-infer release newer than alevin-fry 0.18.3 / piscem-infer 0.6.0. Indexes built with
+> piscem 0.23 or earlier must also be rebuilt.
 
 map-sc
 ------
