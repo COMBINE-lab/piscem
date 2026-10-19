@@ -117,6 +117,8 @@ fn main() -> Result<(), anyhow::Error> {
             decoy_paths,
             seed,
             dict,
+            mphf,
+            mphf_offline,
             tmp_dir,
             ram_limit_gib,
         }) => {
@@ -316,9 +318,14 @@ fn main() -> Result<(), anyhow::Error> {
                 // canonical); false avoids the accept-and-warn notice.
                 canonical: false,
                 seed,
+                mphf,
+                mphf_offline,
                 single_mphf: false,
                 dict,
-                tmp_dir,
+                // SSHash's temporary files (external sort, offline MPHF
+                // records) go inside the work directory unless placed
+                // explicitly, not in `sshash_tmp` under the current directory.
+                tmp_dir: Some(tmp_dir.unwrap_or_else(|| work_dir.join("sshash_tmp"))),
                 ram_limit_gib,
             })?;
 
