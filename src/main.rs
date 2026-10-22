@@ -1,6 +1,6 @@
 use mimalloc::MiMalloc;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -24,6 +24,7 @@ use piscem_rs::cli::map_scrna;
 use piscem_rs::cli::map_scrna::MapScrnaArgs;
 use piscem_rs::cli::poison as rs_poison;
 use piscem_rs::cli::poison::BuildPoisonArgs;
+use piscem_rs::index::paths::{SIGS_EXT, index_artifact_path, validate_index_prefix};
 
 /// Indexing and mapping to compacted colored de Bruijn graphs
 #[derive(Debug, Parser)]
@@ -78,6 +79,15 @@ fn check_threads(threads: usize, ncpus: usize) -> Result<()> {
     Ok(())
 }
 
+/// `prefix` with `suffix` appended to its file name, byte for byte, as in the
+/// wrapper's own `<prefix>_cfish` and `<prefix>_ver.json`. Unlike
+/// [`index_artifact_path`], this inserts no `.`.
+fn with_suffix(prefix: &Path, suffix: &str) -> PathBuf {
+    let mut name = prefix.as_os_str().to_owned();
+    name.push(suffix);
+    PathBuf::from(name)
+}
+
 fn main() -> Result<(), anyhow::Error> {
     let cli_args = Cli::parse();
 
@@ -123,6 +133,11 @@ fn main() -> Result<(), anyhow::Error> {
             ram_limit_gib,
         }) => {
             info!("starting piscem build");
+            // First, before anything (signatures, cf1-rs files, the work
+            // directory) is written: every file of the index is named
+            // `<output>.<ext>` or `<output>_<suffix>`, so `output` must end in
+            // a file name, not name a directory as `-o idx/` does.
+            validate_index_prefix(&output)?;
             check_threads(threads, ncpus)?;
             if mlen >= klen {
                 bail!(
@@ -169,8 +184,9 @@ fn main() -> Result<(), anyhow::Error> {
             // Build CfInput from CLI args, using native variants where possible.
             let cf_input = if let Some(ref seqs) = ref_seqs {
                 if !seqs.is_empty() {
-                    let out_stem =
-                        PathBuf::from(output.as_path().to_string_lossy().into_owned() + ".sigs");
+                    // prepare_fasta appends `.json` to this stem, so it writes
+                    // `<output>.sigs.json`, the file piscem-rs reads.
+                    let out_stem = index_artifact_path(&output, SIGS_EXT).with_extension("");
                     let configs = prepare_fasta::RecordParseConfig {
                         input: seqs.clone(),
                         output_stem: out_stem,
@@ -223,11 +239,11 @@ fn main() -> Result<(), anyhow::Error> {
                 bail!("Input (via --ref-seqs, --ref-lists, or --ref-dirs) must be provided.");
             };
 
-            let cf_out = PathBuf::from(output.as_path().to_string_lossy().into_owned() + "_cfish");
-            let cf_out_str = cf_out.as_path().to_string_lossy();
-            let seg_file = PathBuf::from(format!("{}.cf_seg", cf_out_str));
-            let seq_file = PathBuf::from(format!("{}.cf_seq", cf_out_str));
-            let struct_file = PathBuf::from(format!("{}.json", cf_out_str));
+            // cf1-rs appends its extensions to the prefix it is given.
+            let cf_out = with_suffix(&output, "_cfish");
+            let seg_file = with_suffix(&cf_out, ".cf_seg");
+            let seq_file = with_suffix(&cf_out, ".cf_seq");
+            let struct_file = with_suffix(&cf_out, ".json");
 
             if overwrite {
                 for f in [&struct_file, &seg_file, &seq_file] {
@@ -362,10 +378,7 @@ fn main() -> Result<(), anyhow::Error> {
                 "piscem": piscem_ver
             });
 
-            let mut fname = output.as_path().to_string_lossy().into_owned();
-            fname.push_str("_ver.json");
-
-            let fname = PathBuf::from(fname);
+            let fname = with_suffix(&output, "_ver.json");
             let ver_file = std::fs::File::create(fname)?;
             serde_json::to_writer_pretty(ver_file, &version_json)?;
 
