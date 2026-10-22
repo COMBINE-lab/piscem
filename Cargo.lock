@@ -1695,8 +1695,7 @@ dependencies = [
 [[package]]
 name = "piscem-rs"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f4b4a1a65bc50ecd8cf1e0c23549e2eef13735cf801a9708fec37b5fbd603c2"
+source = "git+https://github.com/COMBINE-lab/piscem-rs?rev=4c12cf6ded03f0048d229f1910fe6c6377f1d90a#4c12cf6ded03f0048d229f1910fe6c6377f1d90a"
 dependencies = [
  "ahash",
  "anyhow",
@@ -2086,8 +2085,7 @@ checksum = "1bc711410fbe7399f390ca1c3b60ad0f53f80e95c5eb935e52268a0e2cd49acc"
 [[package]]
 name = "seq_geom_parser"
 version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8c95f700367e275cebf0698ab89aa8ce184bb0ef1ff2fdc31f741befa208921"
+source = "git+https://github.com/COMBINE-lab/piscem-rs?rev=4c12cf6ded03f0048d229f1910fe6c6377f1d90a#4c12cf6ded03f0048d229f1910fe6c6377f1d90a"
 dependencies = [
  "ariadne",
  "chumsky",
@@ -2416,8 +2414,7 @@ dependencies = [
 [[package]]
 name = "thread-broker"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e9cd700e3d20ade34b3d4c324084ff09cecbc27d61fae2b2dfeebbb2f44094d"
+source = "git+https://github.com/COMBINE-lab/piscem-rs?rev=4c12cf6ded03f0048d229f1910fe6c6377f1d90a#4c12cf6ded03f0048d229f1910fe6c6377f1d90a"
 dependencies = [
  "cpu-time",
  "serde",
