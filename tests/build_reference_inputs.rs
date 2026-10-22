@@ -1,5 +1,5 @@
 //! `piscem build` reference input handling: `--polya-clip-length` reaches the
-//! index.
+//! index, and several `--ref-dirs` index only their FASTA/FASTQ files.
 
 use std::collections::HashMap;
 use std::fs;
@@ -41,7 +41,7 @@ fn scratch_dir(name: &str) -> PathBuf {
     d
 }
 
-fn write_fasta(path: &Path, records: &[(String, String)]) {
+fn fasta(records: &[(String, String)]) -> String {
     let mut s = String::new();
     for (name, seq) in records {
         s.push_str(&format!(">{} some description\n", name));
@@ -50,7 +50,36 @@ fn write_fasta(path: &Path, records: &[(String, String)]) {
             s.push('\n');
         }
     }
-    fs::write(path, s).unwrap();
+    s
+}
+
+fn write_fasta(path: &Path, records: &[(String, String)]) {
+    fs::write(path, fasta(records)).unwrap();
+}
+
+/// `data` as a gzip file holding one stored (uncompressed) deflate block, so
+/// the test needs no compression crate.
+fn gzip_stored(data: &[u8]) -> Vec<u8> {
+    let len = u16::try_from(data.len()).unwrap();
+    let crc = !data.iter().fold(!0u32, |mut c, &b| {
+        c ^= u32::from(b);
+        for _ in 0..8 {
+            c = if c & 1 == 1 {
+                (c >> 1) ^ 0xedb8_8320
+            } else {
+                c >> 1
+            };
+        }
+        c
+    });
+    let mut gz = vec![0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 0xff];
+    gz.push(1); // final block, stored
+    gz.extend(len.to_le_bytes());
+    gz.extend((!len).to_le_bytes());
+    gz.extend(data);
+    gz.extend(crc.to_le_bytes());
+    gz.extend((data.len() as u32).to_le_bytes());
+    gz
 }
 
 /// `n` random references named `<prefix><i>`; every third one ends in a
@@ -344,5 +373,78 @@ fn polya_clip_length_is_rejected_with_ref_lists_and_ref_dirs() {
         );
         assert!(!index_file(&prefix, "refinfo").exists());
     }
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn multiple_ref_dirs_index_only_sequence_files() {
+    let dir = scratch_dir("refdirs");
+    let mut rng = Rng(0x5851_f42d_4c95_7f2d);
+    let dirs: Vec<PathBuf> = ["d1", "d2", "d3"].iter().map(|d| dir.join(d)).collect();
+    for d in &dirs {
+        fs::create_dir_all(d).unwrap();
+    }
+    // One FASTA per directory, so the order in which each is listed does not
+    // matter. Their names do not either: a FASTA with no extension, or a
+    // gzipped one, is indexed as it was before.
+    let a = dirs[0].join("a.fa");
+    let c = dirs[1].join("chr1");
+    let b = dirs[2].join("b.fa.gz");
+    write_fasta(&a, &references(&mut rng, "a", 40));
+    write_fasta(&c, &references(&mut rng, "c", 20));
+    let b_fasta = fasta(&references(&mut rng, "b", 20));
+    fs::write(&b, gzip_stored(b_fasta.as_bytes())).unwrap();
+    // None is FASTA/FASTQ; handed to cf1-rs, each panics the build.
+    let skipped = [
+        dirs[0].join("a.fa.fai"),
+        dirs[0].join("empty.fa"),
+        dirs[1].join("README.txt"),
+        dirs[2].join("genes.gtf.gz"),
+    ];
+    fs::write(&skipped[0], "a0\t300\t40\t60\t61\n").unwrap();
+    fs::write(&skipped[1], "").unwrap();
+    fs::write(&skipped[2], "these are references\n").unwrap();
+    let gtf = "c0\tsrc\texon\t1\t100\t.\t+\t.\tgene_id \"g0\";\n";
+    fs::write(&skipped[3], gzip_stored(gtf.as_bytes())).unwrap();
+
+    let dir_list = dirs
+        .iter()
+        .map(|d| d.display().to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    let (from_dirs, out) = build(&dir, "dirs", &["-d", &dir_list]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "build failed:\n{}", stderr);
+    for f in &skipped {
+        assert!(
+            stderr.contains(&format!(
+                "skipping {}: empty, or not a FASTA/FASTQ file",
+                f.display()
+            )),
+            "no warning for {}:\n{}",
+            f.display(),
+            stderr
+        );
+    }
+    // ...and only for them.
+    assert_eq!(
+        stderr.matches(": empty, or not a FASTA/FASTQ file").count(),
+        skipped.len(),
+        "{}",
+        stderr
+    );
+
+    // Same index as naming the three FASTA files directly.
+    let seqs = format!("{},{},{}", a.display(), c.display(), b.display());
+    let from_seqs = build_ok(&dir, "seqs", &["-s", &seqs]);
+    for ext in INDEX_EXTS {
+        assert_eq!(
+            read_index_file(&from_dirs, ext),
+            read_index_file(&from_seqs, ext),
+            "{} differs",
+            ext
+        );
+    }
+    assert_eq!(ref_lengths(&from_dirs).len(), 80);
     let _ = fs::remove_dir_all(&dir);
 }

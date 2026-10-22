@@ -56,6 +56,36 @@ enum Commands {
     MapSCAtac(MapSCAtacOpts),
 }
 
+/// Whether a file found in one of several `--ref-dirs` should be indexed.
+///
+/// cf1-rs picks the files of a single directory itself, by extension; several
+/// directories are listed here, and cf1-rs panics on any file it is handed
+/// that needletail cannot open as FASTA/FASTQ (a `.fai`, a `README.txt`, a
+/// `genes.gtf.gz`, an empty file). So keep exactly the files needletail can
+/// open, whatever their name: a build that worked before indexes the same
+/// files. A file that cannot be read is an error, not a file to skip.
+fn is_reference_file(path: &Path) -> Result<bool> {
+    use needletail::errors::ParseErrorKind::{EmptyFile, UnknownFormat};
+    use std::io::Read;
+    let context = || format!("reading reference file {}", path.display());
+    match needletail::parse_fastx_file(path) {
+        Ok(_) => Ok(true),
+        Err(e) if matches!(e.kind, UnknownFormat) => Ok(false),
+        // needletail reports any error on its first 2-byte read as EmptyFile;
+        // read them again so that an I/O error is not taken for a short file.
+        Err(e) if matches!(e.kind, EmptyFile) => {
+            let mut head = [0u8; 2];
+            match std::fs::File::open(path).and_then(|mut f| f.read_exact(&mut head)) {
+                Err(err) if err.kind() != io::ErrorKind::UnexpectedEof => {
+                    Err(err).with_context(context)
+                }
+                _ => Ok(false),
+            }
+        }
+        Err(e) => Err(e).with_context(context),
+    }
+}
+
 /// What identifies the file at `path` (following symlinks), or `None` if there
 /// is none: two paths get the same value exactly when they name the same file.
 /// That is the (device, inode) pair on Unix, so a hard link is caught as well
@@ -263,7 +293,14 @@ fn main() -> Result<(), anyhow::Error> {
                         {
                             let path = entry?.path();
                             if path.is_file() {
-                                files.push(path);
+                                if is_reference_file(&path)? {
+                                    files.push(path);
+                                } else {
+                                    warn!(
+                                        "skipping {}: empty, or not a FASTA/FASTQ file",
+                                        path.display()
+                                    );
+                                }
                             }
                         }
                     }
