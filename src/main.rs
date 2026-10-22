@@ -413,6 +413,11 @@ fn main() -> Result<(), anyhow::Error> {
                     warn!("{} is not supported by piscem-rs and will be ignored", name);
                 }
             }
+            if scatac_opts.skipping_strategy.is_some() {
+                warn!(
+                    "--skipping-strategy has no effect for scATAC (every k-mer is used) and will be ignored"
+                );
+            }
 
             let barcode = scatac_opts.barcode.unwrap_or_default();
             let args = MapScatacArgs {

@@ -452,9 +452,12 @@ pub(crate) struct MapSCAtacOpts {
     #[arg(short = 'c', long, hide = true)]
     pub struct_constraints: bool,
 
-    /// the skipping strategy to use for k-mer collection
-    #[arg(long, default_value = &DefaultParams::SKIPPING_STRATEGY, value_parser = clap::builder::PossibleValuesParser::new(["permissive", "strict"]))]
-    pub skipping_strategy: String,
+    /// [DEPRECATED] the skipping strategy to use for k-mer collection.
+    /// scATAC mapping always uses every k-mer, so this option has no effect
+    /// and will be ignored. It is still accepted (and validated) so existing
+    /// command lines keep parsing.
+    #[arg(long, hide = true, value_parser = clap::builder::PossibleValuesParser::new(["permissive", "strict"]))]
+    pub skipping_strategy: Option<String>,
 
     /// [DEPRECATED] output mappings in sam format.
     /// This option is no longer supported and will be ignored.
