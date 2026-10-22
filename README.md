@@ -233,4 +233,7 @@ by `:`). Likewise, since the `:` specifier means to extract this piece until the
 the unbounded specifier must be the last specifier in the description of each read (_if it occurs_).
 
 A specification can also contain a sample barcode, `s[N]`, and a fixed anchor sequence, `f[SEQ]`.
-For example, simpleaf describes 10x Flex v1 reads as `1{b[16]u[12]x:}2{r[50]x[18]s[8]x:}`.
+For example, simpleaf describes 10x Flex v1 reads as `1{b[16]u[12]x:}2{r[50]x[18]s[8]x:}`. The
+[`seq_geom_parser` documentation](https://docs.rs/seq_geom_parser) has the full grammar, including
+variable-length pieces placed by an anchor (such as `x[0-3]f[TTGCTAGGACCG]s[10]`), which the rule
+above does not cover.
