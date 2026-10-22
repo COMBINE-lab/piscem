@@ -144,8 +144,14 @@ pub(crate) struct BuildOpts {
 
     /// If provided (default is not to clip polyA), then reference sequences
     /// ending with polyA tails of length greater than or equal to this value
-    /// will be clipped.
-    #[arg(long, help_heading = "Index Construction Parameters")]
+    /// will be clipped (all of their trailing `A`s; case-sensitive). Only with
+    /// `--ref-seqs`. The clipped reference is written to `<output>.fa.gz` and
+    /// removed after indexing unless `--keep-intermediate-dbg` is given.
+    #[arg(
+        long,
+        help_heading = "Index Construction Parameters",
+        conflicts_with_all = ["ref_lists", "ref_dirs"]
+    )]
     pub polya_clip_length: Option<usize>,
 
     /// path to (optional) ',' sparated list of decoy sequences used to insert poison

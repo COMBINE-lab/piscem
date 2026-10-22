@@ -1,6 +1,6 @@
 use mimalloc::MiMalloc;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -54,6 +54,21 @@ enum Commands {
     /// map reads for scAtac processing
     #[command(arg_required_else_help = true)]
     MapSCAtac(MapSCAtacOpts),
+}
+
+/// What identifies the file at `path` (following symlinks), or `None` if there
+/// is none: two paths get the same value exactly when they name the same file.
+/// That is the (device, inode) pair on Unix, so a hard link is caught as well
+/// as a symlink; elsewhere it is the canonical path.
+#[cfg(unix)]
+fn file_id(path: &Path) -> Option<(u64, u64)> {
+    use std::os::unix::fs::MetadataExt;
+    std::fs::metadata(path).ok().map(|m| (m.dev(), m.ino()))
+}
+
+#[cfg(not(unix))]
+fn file_id(path: &Path) -> Option<PathBuf> {
+    path.canonicalize().ok()
 }
 
 /// Validate a requested thread count against the parallelism actually available.
@@ -167,19 +182,54 @@ fn main() -> Result<(), anyhow::Error> {
             }
 
             // Build CfInput from CLI args, using native variants where possible.
+            // With --polya-clip-length, cf1-rs reads the clipped reference
+            // instead; it is removed along with the cf1-rs intermediates.
+            let mut clipped_ref = None;
             let cf_input = if let Some(ref seqs) = ref_seqs {
                 if !seqs.is_empty() {
                     let out_stem =
                         PathBuf::from(output.as_path().to_string_lossy().into_owned() + ".sigs");
+                    if polya_clip_length.is_some() {
+                        // prepare_fasta truncates `<out>.fa.gz` before it reads
+                        // the inputs (and it is removed after indexing), so it
+                        // must be neither a reference nor a decoy file.
+                        let clipped = out_stem.with_extension("fa.gz");
+                        if let Some(clipped_id) = file_id(&clipped) {
+                            let is_clipped = |p: &Path| file_id(p).as_ref() == Some(&clipped_id);
+                            if let Some(s) = seqs.iter().find(|s| is_clipped(Path::new(s))) {
+                                bail!(
+                                    "--polya-clip-length writes the clipped reference to {}, \
+                                     which is the input {}; choose another --output prefix.",
+                                    clipped.display(),
+                                    s
+                                );
+                            }
+                            if let Some(d) = decoy_paths.iter().flatten().find(|d| is_clipped(d)) {
+                                bail!(
+                                    "--polya-clip-length writes the clipped reference to {}, \
+                                     which is the decoy file {}; choose another --output prefix.",
+                                    clipped.display(),
+                                    d.display()
+                                );
+                            }
+                            warn!(
+                                "{} already exists; it will be overwritten with the clipped reference.",
+                                clipped.display()
+                            );
+                        }
+                        clipped_ref = Some(clipped);
+                    }
                     let configs = prepare_fasta::RecordParseConfig {
                         input: seqs.clone(),
                         output_stem: out_stem,
                         polya_clip_length,
                     };
                     info!("Computing and recording reference signatures...");
-                    prepare_fasta::parse_records(configs)?;
+                    // Without clipping these are the input files; with it, the
+                    // one clipped file (the signatures are of the unclipped input).
+                    let files = prepare_fasta::parse_records(configs)?;
                     info!("done.");
-                    CfInput::Files(seqs.iter().map(PathBuf::from).collect())
+                    CfInput::Files(files)
                 } else {
                     bail!("--ref-seqs provided but empty");
                 }
@@ -350,6 +400,12 @@ fn main() -> Result<(), anyhow::Error> {
                     }
                 }
                 // Keep the json file — it's small and may contain useful info.
+                if let Some(path) = &clipped_ref {
+                    match std::fs::remove_file(path) {
+                        Ok(_) => info!("removed polyA-clipped reference {}", path.display()),
+                        Err(e) => warn!("cannot remove {}, error: {:?}", path.display(), e),
+                    }
+                }
             }
 
             let piscem_rs_ver = piscem_rs::VERSION;
