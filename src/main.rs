@@ -138,6 +138,16 @@ fn main() -> Result<(), anyhow::Error> {
             // `<output>.<ext>` or `<output>_<suffix>`, so `output` must end in
             // a file name, not name a directory as `-o idx/` does.
             validate_index_prefix(&output)?;
+            // cf1-rs panics on a prefix that is not UTF-8 (after the signature
+            // pass has written its file), and `map-* -i` takes only UTF-8, so
+            // such a prefix can never become a usable index.
+            if output.to_str().is_none() {
+                bail!(
+                    "invalid index prefix {:?}: it must be valid UTF-8, because cf1-rs and \
+                     `piscem map-* -i` only accept UTF-8 paths",
+                    output
+                );
+            }
             check_threads(threads, ncpus)?;
             if mlen >= klen {
                 bail!(

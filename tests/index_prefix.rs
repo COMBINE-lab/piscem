@@ -4,10 +4,11 @@
 //! files and the signatures are `<prefix>.<ext>`, the wrapper's own are
 //! `<prefix>_cfish.*` and `<prefix>_ver.json`. A dot in the prefix's file name
 //! (`-o idx/gen.v2`) is part of the name, so two such indexes in one directory
-//! do not collide. A prefix that names a directory (`-o idx/`) is refused
-//! before anything is written.
+//! do not collide. A prefix that names a directory (`-o idx/`), or that is not
+//! UTF-8, is refused before anything is written.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -56,7 +57,7 @@ impl Scratch {
     }
 
     /// Run `piscem` with `args` in this directory.
-    fn piscem(&self, args: &[&str]) -> Output {
+    fn piscem<S: AsRef<OsStr> + std::fmt::Debug>(&self, args: &[S]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_piscem"))
             .current_dir(&self.0)
             .env("NO_COLOR", "1")
@@ -76,9 +77,10 @@ impl Scratch {
     }
 
     /// Path relative to this directory -> contents (`None` for a directory)
-    /// of everything below it.
-    fn tree(&self) -> BTreeMap<PathBuf, Option<Vec<u8>>> {
-        fn walk(root: &Path, dir: &Path, out: &mut BTreeMap<PathBuf, Option<Vec<u8>>>) {
+    /// of everything below it. Compare two with [`changes`], which names the
+    /// paths that differ instead of printing the files.
+    fn tree(&self) -> Tree {
+        fn walk(root: &Path, dir: &Path, out: &mut Tree) {
             for e in fs::read_dir(dir).unwrap() {
                 let p = e.unwrap().path();
                 let rel = p.strip_prefix(root).unwrap().to_path_buf();
@@ -127,6 +129,22 @@ impl Drop for Scratch {
 }
 
 const NREADS: usize = 200;
+
+type Tree = BTreeMap<PathBuf, Option<Vec<u8>>>;
+
+/// The paths added, removed or changed from `before` to `after`.
+fn changes(before: &Tree, after: &Tree) -> Vec<String> {
+    let paths: BTreeSet<&PathBuf> = before.keys().chain(after.keys()).collect();
+    paths
+        .into_iter()
+        .filter_map(|p| match (before.get(p), after.get(p)) {
+            (None, _) => Some(format!("added {}", p.display())),
+            (_, None) => Some(format!("removed {}", p.display())),
+            (Some(b), Some(a)) if a != b => Some(format!("changed {}", p.display())),
+            _ => None,
+        })
+        .collect()
+}
 
 /// xorshift64: deterministic sequences without a `rand` dependency.
 struct Rng(u64);
@@ -193,38 +211,62 @@ fn expected_files(name: &str) -> BTreeSet<String> {
     .collect()
 }
 
-/// `-o <dir>/` names a directory, not an index: the build fails, says which
-/// prefix it refused, and writes nothing at all (no signatures, no cf1-rs
-/// files, no output or work directory), whether or not the directory exists.
+/// `build -o <prefix>` fails, names the prefix (as the error prints it,
+/// `shown`), and writes nothing at all: no signatures, no cf1-rs files, no
+/// output directory, and no work directory (there is no `-w`, so the default
+/// `./workdir.noindex` would be created in the scratch directory).
+fn assert_build_refused(s: &Scratch, prefix: &OsStr, shown: &str) {
+    let before = s.tree();
+    let mut args: Vec<&OsStr> = [
+        "build",
+        "-s",
+        "refA.fa",
+        "--decoy-paths",
+        "decoys.fa",
+        "-t",
+        "1",
+        "-o",
+    ]
+    .into_iter()
+    .map(OsStr::new)
+    .collect();
+    args.push(prefix);
+    let out = s.piscem(&args);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        !out.status.success(),
+        "`build -o {shown}` should fail:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("invalid index prefix") && stderr.contains(&format!("\"{shown}\"")),
+        "`build -o {shown}`: the error should name the prefix:\n{stderr}"
+    );
+    let changed = changes(&before, &s.tree());
+    assert!(
+        changed.is_empty(),
+        "`build -o {shown}` wrote something: {changed:#?}"
+    );
+}
+
+/// `-o <dir>/` names a directory, not an index, so it is refused before
+/// anything is written, whether or not the directory exists.
 #[test]
 fn build_refuses_a_directory_prefix_before_writing_anything() {
     let s = Scratch::new("dir");
     fs::create_dir(s.path("existing")).unwrap();
-    let before = s.tree();
-    // No `-w`: the default work directory, `./workdir.noindex`, is in here too.
     for prefix in ["existing/", "missing/", "missing/deeper/", "."] {
-        let out = s.piscem(&[
-            "build",
-            "-s",
-            "refA.fa",
-            "--decoy-paths",
-            "decoys.fa",
-            "-t",
-            "1",
-            "-o",
-            prefix,
-        ]);
-        let stderr = String::from_utf8_lossy(&out.stderr);
-        assert!(
-            !out.status.success(),
-            "`build -o {prefix}` should fail:\n{stderr}"
-        );
-        assert!(
-            stderr.contains("invalid index prefix") && stderr.contains(&format!("\"{prefix}\"")),
-            "`build -o {prefix}`: the error should name the prefix:\n{stderr}"
-        );
-        assert_eq!(s.tree(), before, "`build -o {prefix}` wrote something");
+        assert_build_refused(&s, OsStr::new(prefix), prefix);
     }
+}
+
+/// A prefix that is not UTF-8 is refused the same way: cf1-rs cannot write
+/// the graph to it (it panics), and `map-* -i` could not load the index.
+#[cfg(unix)]
+#[test]
+fn build_refuses_a_non_utf8_prefix_before_writing_anything() {
+    use std::os::unix::ffi::OsStrExt;
+    let s = Scratch::new("utf8");
+    assert_build_refused(&s, OsStr::from_bytes(b"idx/g\xffn"), r"idx/g\xFFn");
 }
 
 /// An undotted prefix (`idx/gen`, like simpleaf's `<dir>/piscem_idx`) and a
@@ -265,9 +307,8 @@ fn undotted_and_dotted_prefixes_name_every_file_after_the_full_prefix() {
     let names: BTreeSet<String> = after.keys().cloned().collect();
     assert_eq!(names, both);
     for (name, bytes) in &gen_files {
-        assert_eq!(
-            after.get(name),
-            Some(bytes),
+        assert!(
+            after.get(name) == Some(bytes),
             "building idx/gen.v2 changed {name}"
         );
     }
