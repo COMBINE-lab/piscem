@@ -58,9 +58,11 @@ enum Commands {
 
 /// Validate a requested thread count against the parallelism actually available.
 ///
-/// Zero is an error, but over-requesting is only a warning: piscem-rs caps the
-/// effective budget itself and records both the requested and effective values
-/// in `map_info.json`, so refusing outright would reject runs that work fine.
+/// Zero is an error, but over-requesting is only a warning: the effective
+/// budget is capped at `ncpus` (for the mapping commands by piscem-rs, which
+/// records both the requested and effective values in `map_info.json`; for
+/// `build` by the wrapper), so refusing outright would reject runs that work
+/// fine.
 fn check_threads(threads: usize, ncpus: usize) -> Result<()> {
     if threads == 0 {
         bail!(
@@ -98,7 +100,8 @@ fn main() -> Result<(), anyhow::Error> {
     // `num_cpus::get()` does not; piscem-rs caps the effective budget the same
     // way, so agreeing here keeps the wrapper from accepting a number that gets
     // silently clamped one layer down.
-    let ncpus = std::thread::available_parallelism().map_or(1, |n| n.get());
+    let detected_ncpus = std::thread::available_parallelism().map(|n| n.get()).ok();
+    let ncpus = detected_ncpus.unwrap_or(1);
 
     match cli_args.command {
         Commands::Build(BuildOpts {
@@ -124,6 +127,13 @@ fn main() -> Result<(), anyhow::Error> {
         }) => {
             info!("starting piscem build");
             check_threads(threads, ncpus)?;
+            // Unlike the mapping paths, nothing below the wrapper caps the
+            // build's thread count: cf1-rs, SSHash and the poison-table builder
+            // each spawn as many threads as they are given. Cap it here, as
+            // `check_threads` has just reported. If the parallelism can't be
+            // detected, `ncpus` is only a fallback, so keep the request as
+            // given, as piscem-rs's mapping budget does.
+            let threads = detected_ncpus.map_or(threads, |n| threads.min(n));
             if mlen >= klen {
                 bail!(
                     "minimizer length ({}) must be < k-mer length ({})",
