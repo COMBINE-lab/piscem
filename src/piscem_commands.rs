@@ -124,7 +124,7 @@ pub(crate) struct BuildOpts {
     #[arg(short, long)]
     pub output: PathBuf,
 
-    /// retain the reduced format GFA files produced by cuttlefish that
+    /// retain the reduced format GFA files produced by cf1-rs that
     /// describe the reference cDBG (the default is to remove these).
     #[arg(long, help_heading = "Indexing Details")]
     pub keep_intermediate_dbg: bool,
@@ -133,7 +133,7 @@ pub(crate) struct BuildOpts {
     #[arg(short = 'w', long, help_heading = "Indexing Details", default_value_os_t = PathBuf::from("./workdir.noindex"))]
     pub work_dir: PathBuf,
 
-    /// overwite an existing index if the output path is the same.
+    /// overwrite an existing index if the output path is the same.
     #[arg(long, help_heading = "Indexing Details")]
     pub overwrite: bool,
 
@@ -148,7 +148,7 @@ pub(crate) struct BuildOpts {
     #[arg(long, help_heading = "Index Construction Parameters")]
     pub polya_clip_length: Option<usize>,
 
-    /// path to (optional) ',' sparated list of decoy sequences used to insert poison
+    /// path to (optional) ',' separated list of decoy sequences used to insert poison
     /// k-mer information into the index.
     #[arg(long, value_delimiter = ',')]
     pub decoy_paths: Option<Vec<PathBuf>>,
@@ -186,8 +186,11 @@ pub(crate) struct BuildOpts {
     #[arg(long, help_heading = "Indexing Details")]
     pub tmp_dir: Option<PathBuf>,
 
-    /// RAM ceiling, in GiB, for SSHash's external minimizer sort. Unset keeps
-    /// SSHash's default (8 GiB); a smaller value spills to disk sooner.
+    /// RAM ceiling, in GiB, for SSHash's external minimizer sort; a smaller
+    /// value spills to disk sooner, and 0 means no limit. Unset, it is half of
+    /// the memory this process may use (the smallest of physical RAM,
+    /// RLIMIT_AS and the cgroup limit), but at least 8 GiB, or all of it if
+    /// less is usable; 8 GiB if memory cannot be detected.
     #[arg(long, help_heading = "Indexing Details")]
     pub ram_limit_gib: Option<usize>,
 }
@@ -319,7 +322,7 @@ pub(crate) struct MapBulkOpts {
     )]
     pub read2: Option<Vec<String>>,
 
-    /// path to a ',' separated list of read unpaired read files
+    /// path to a ',' separated list of unpaired read files
     #[arg(short = 'r', long, help_heading = "Input", value_delimiter = ',', conflicts_with_all = ["read1", "read2"])]
     pub reads: Option<Vec<String>>,
 
@@ -413,6 +416,7 @@ pub(crate) struct MapSCAtacOpts {
     )]
     pub read2: Option<Vec<String>>,
 
+    /// path to a ',' separated list of unpaired read files
     #[arg(short = 'r', long, help_heading = "Input", value_delimiter = ',', conflicts_with_all = ["read1", "read2"])]
     pub reads: Option<Vec<String>>,
 

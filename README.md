@@ -59,7 +59,7 @@ Commands:
   help         Print this message or the help of the given subcommand(s)
 
 Options:
-  -q, --quiet    be quiet (no effect yet for cDBG building phase of indexing)
+  -q, --quiet    be quiet: print only warnings and errors
   -h, --help     Print help
   -V, --version  Print version
 ```
@@ -94,10 +94,14 @@ built offline in `--tmp-dir` for large references, see `--mphf-offline auto|alwa
 `partitioned` (~3M-key functions built in parallel; no temporary disk, slightly slower lookups).
 The index format, and the mapping results, are the same.
 
-`--ram-limit-gib` caps the RAM that external minimizer sort may use (default 8 GiB); a smaller value
-spills to disk sooner. Both are useful on HPC systems where `/tmp` is small or the job runs under a
-cgroup memory limit. The index build also detects available memory automatically, walking the cgroup
-chain so a container limit is respected rather than the host's total.
+`--ram-limit-gib` caps the RAM that SSHash's minimizer sort may use; a smaller value spills to disk
+sooner, and `0` means no limit. Both are useful on HPC systems where `/tmp` is small or the job runs
+under a cgroup memory limit. Unset, the cap is derived from the memory this process may use: the
+smallest of physical RAM, `RLIMIT_AS` (`ulimit -v`) and the cgroup memory limit, walking the cgroup
+chain so a container or scheduler limit is respected rather than the host's total. The cap is half
+of that, but at least 8 GiB, or all of it when less than 8 GiB is usable (in whole GiB, rounded
+down); if memory cannot be detected, it is 8 GiB. The build log reports the value used
+(`sshash minimizer-sort RAM budget: ...`).
 
 > **Note**
 > If you are running on an Apple silicon machine, it is highly recommended that you set `-t` to be

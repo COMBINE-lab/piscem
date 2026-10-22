@@ -30,7 +30,7 @@ use piscem_rs::cli::poison::BuildPoisonArgs;
 #[command(author, version, about)]
 #[command(propagate_version = true)]
 struct Cli {
-    /// be quiet (no effect yet for cDBG building phase of indexing).
+    /// be quiet: print only warnings and errors.
     #[arg(short, long)]
     quiet: bool,
     #[command(subcommand)]
@@ -306,7 +306,7 @@ fn main() -> Result<(), anyhow::Error> {
                 cf_result.unitig_count, cf_result.vertex_count
             );
 
-            // Build piscem-rs index from cuttlefish output
+            // Build piscem-rs index from cf1-rs output
             rs_build::run(BuildArgs {
                 input: cf_out.clone(),
                 output: output.clone(),
