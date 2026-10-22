@@ -25,8 +25,8 @@ use piscem_rs::cli::map_scrna::MapScrnaArgs;
 use piscem_rs::cli::poison as rs_poison;
 use piscem_rs::cli::poison::BuildPoisonArgs;
 use piscem_rs::index::paths::{
-    BUILD_ARTIFACT_EXTENSIONS, POISON_ARTIFACT_EXTENSIONS, SIGS_EXT, index_artifact_path,
-    validate_index_prefix,
+    BUILD_ARTIFACT_EXTENSIONS, CTAB_EXT, DICT_EXT, IndexLayout, IndexPaths,
+    POISON_ARTIFACT_EXTENSIONS, POISON_EXT, SIGS_EXT, index_artifact_path, validate_index_prefix,
 };
 
 /// Indexing and mapping to compacted colored de Bruijn graphs
@@ -179,6 +179,71 @@ impl Drop for NewDirs {
             let _ = std::fs::remove_dir(dir);
         }
     }
+}
+
+/// The piscem-rs version (major, minor, patch) that `<prefix>_ver.json`
+/// records, if it exists and records one.
+fn recorded_piscem_rs_version(prefix: &Path) -> Option<(u64, u64, u64)> {
+    let ver: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(ver_file(prefix)).ok()?).ok()?;
+    let mut parts = ver
+        .get("piscem-rs")?
+        .as_str()?
+        .split(['.', '-', '+'])
+        .map(|p| p.parse().ok());
+    Some((parts.next()??, parts.next()??, parts.next()??))
+}
+
+/// Indexes beside `output` that piscem-rs <= 0.11.0 built at a dotted prefix
+/// `<output>.<x>`, and whose core files are therefore `<output>.ssi`,
+/// `<output>.ctab`, ...: the files a build at `output` writes.
+///
+/// Candidates are the prefixes `<output>.<x>` with a file that only a
+/// finished build writes at its own prefix: the wrapper's `_ver.json` (last)
+/// or `build-poison`'s `.poison` (after the core files). A failed build leaves
+/// at most `.sigs.json` and `_cfish.*`, so it is not one. A candidate is kept
+/// if [`IndexPaths::resolve`] resolves it to the [`IndexLayout::Legacy`]
+/// layout, i.e. to the core files at `output`, and either its `_ver.json`
+/// records piscem-rs <= 0.11.0 (a later one wrote the current layout, so its
+/// core files cannot be at `output`) or, without a `_ver.json`, it has a
+/// `.poison`. An index that piscem-rs's own `build` made without a poison
+/// table has neither, so it is never named.
+fn legacy_siblings(output: &Path) -> Vec<PathBuf> {
+    let Some(name) = output.file_name() else {
+        return Vec::new();
+    };
+    let dir = output
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let poison_suffix = format!(".{POISON_EXT}");
+    let mut found: Vec<PathBuf> = entries
+        .filter_map(|e| {
+            let file = e.ok()?.file_name();
+            let file = file.to_str()?;
+            let sib = ["_ver.json", &poison_suffix]
+                .into_iter()
+                .find_map(|suffix| file.strip_suffix(suffix))?;
+            // `<output>.<x>` with no further dot: its pre-0.11.1 core files
+            // are at its prefix with the last extension dropped, `output`.
+            (Path::new(sib).with_extension("").as_os_str() == name && sib != name)
+                .then(|| output.with_file_name(sib))
+        })
+        .filter(|sib| {
+            IndexPaths::resolve(sib).layout() == IndexLayout::Legacy
+                && if ver_file(sib).exists() {
+                    recorded_piscem_rs_version(sib).is_some_and(|v| v <= (0, 11, 0))
+                } else {
+                    index_artifact_path(sib, POISON_EXT).is_file()
+                }
+        })
+        .collect();
+    found.sort();
+    found.dedup();
+    found
 }
 
 fn main() -> Result<(), anyhow::Error> {
@@ -355,6 +420,19 @@ fn main() -> Result<(), anyhow::Error> {
                         return Err(e).with_context(|| format!("failed to check {}", f.display()));
                     }
                 }
+            }
+            for sib in legacy_siblings(&output) {
+                warn!(
+                    "{}, {}, ... are also the core files of the index {sib}, which \
+                     piscem-rs <= 0.11.0 built in its pre-0.11.1 layout. Building {} \
+                     replaces them, and {sib} would then load the new index's files \
+                     instead of its own: rebuild {sib}, which gives it its own {sib}.* \
+                     files, or remove it.",
+                    index_artifact_path(&output, DICT_EXT).display(),
+                    index_artifact_path(&output, CTAB_EXT).display(),
+                    output.display(),
+                    sib = sib.display(),
+                );
             }
             if !overwrite && !existing.is_empty() {
                 warn!(

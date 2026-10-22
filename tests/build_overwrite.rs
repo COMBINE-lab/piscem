@@ -427,6 +427,62 @@ fn overwrite_refuses_a_non_file_at_an_index_path() {
     }
 }
 
+/// A build at `leg/gen` writes over the core files of an index that
+/// piscem-rs <= 0.11.0 built at the dotted prefix `leg/gen.v1` (`leg/gen.ssi`,
+/// ...), so it names that index in a warning, whether it is refused or, with
+/// `--overwrite`, goes ahead. So it does for one known only by the poison
+/// table `build-poison` wrote at its prefix. Not named: an index in the
+/// current layout, what a failed build left (`.sigs.json`, `_cfish.json`),
+/// and a `_ver.json` that records a later piscem-rs, even though each of them
+/// would also load the core files at `leg/gen`.
+#[test]
+fn build_over_the_core_of_a_legacy_dotted_index_warns() {
+    let s = Scratch::new("legacy");
+    let ver = |piscem_rs: &str| format!("{{\"piscem-rs\": \"{piscem_rs}\"}}");
+    s.build_ok(&["-s", "refA.fa", "-o", "leg/gen.v1"]);
+    // Move the core files to where piscem-rs <= 0.11.0 wrote them, and record
+    // that version.
+    for ext in ["ssi", "ssi.mphf", "ctab", "refinfo", "ectab", "tdct", "tct"] {
+        let from = s.path(&format!("leg/gen.v1.{ext}"));
+        if from.exists() {
+            fs::rename(from, s.path(&format!("leg/gen.{ext}"))).unwrap();
+        }
+    }
+    fs::write(s.path("leg/gen.v1_ver.json"), ver("0.11.0")).unwrap();
+    s.build_ok(&["-s", "refA.fa", "-o", "leg/gen.v3"]);
+    for f in [".sigs.json", "_cfish.json"] {
+        fs::copy(
+            s.path(&format!("leg/gen.v1{f}")),
+            s.path(&format!("leg/gen.v4{f}")),
+        )
+        .unwrap();
+    }
+    fs::write(s.path("leg/gen.v5_ver.json"), ver("0.11.1")).unwrap();
+    fs::write(s.path("leg/gen.v6.poison"), "").unwrap();
+
+    for overwrite in [false, true] {
+        let mut args = vec!["-s", "refB.fa", "-o", "leg/gen"];
+        if overwrite {
+            args.push("--overwrite");
+        }
+        let out = s.build(&args);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        if overwrite {
+            assert!(out.status.success(), "{stderr}");
+        } else {
+            assert_refused(&out);
+        }
+        for sib in ["leg/gen.v1", "leg/gen.v6"] {
+            let warning =
+                format!("are also the core files of the index {sib}, which piscem-rs <= 0.11.0");
+            assert!(stderr.contains(&warning), "{args:?}: {sib}:\n{stderr}");
+        }
+        for sib in ["leg/gen.v3", "leg/gen.v4", "leg/gen.v5"] {
+            assert!(!stderr.contains(sib), "{args:?}: {sib}:\n{stderr}");
+        }
+    }
+}
+
 /// An output or work directory that cannot be created, because a file or a
 /// dangling symbolic link is at its path or at one of its parents', fails
 /// before either directory is created.
