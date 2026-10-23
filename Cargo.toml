@@ -21,7 +21,7 @@ toml = "0.8"
 # gzip decoder is not compiled in and `--decoder` silently does nothing.
 # `default-features = false` drops piscem-rs's `mimalloc` feature, which only
 # installs a #[global_allocator] in piscem-rs's own binary — we install ours.
-piscem-rs = { version = "0.11.0", default-features = false, features = [
+piscem-rs = { version = "0.11.1", default-features = false, features = [
   "rapidgzip",
 ] }
 cf1-rs = "0.5.1"
@@ -34,15 +34,6 @@ tracing-subscriber = { version = "0.3", default-features = true, features = [
 prepare_fasta = { version = "0.2.0" }
 serde_json = "1.0.149"
 mimalloc = "0.1"
-
-# TEMPORARY: piscem-rs fix/index-prefix-paths (COMBINE-lab/piscem-rs#15), which
-# names every index file `<prefix>.<ext>` and adds `piscem_rs::index::paths`.
-# That branch still says 0.11.0, so the requirement above stays "0.11.0" for
-# now. Once piscem-rs 0.11.1 is on crates.io, delete this section, require
-# "0.11.1" above, and refresh Cargo.lock (`cargo update -p piscem-rs`).
-# `cargo publish` drops [patch], so do that before publishing piscem 0.24.0.
-[patch.crates-io]
-piscem-rs = { git = "https://github.com/COMBINE-lab/piscem-rs", rev = "4c12cf6ded03f0048d229f1910fe6c6377f1d90a" }
 
 [profile.release]
 lto = "thin"
