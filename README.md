@@ -22,7 +22,9 @@ should be fine already on OSX), but you can accomplish this by executing:
 $ ulimit -n 2048
 ```
 
-before running `piscem`.
+before running `piscem`. `piscem build` can hold many files open at once: when SSHash's minimizer
+sort spills to disk (large references such as a genome, or a small `--ram-limit-gib`), it merges
+all of its sorted runs at once, and there is at least one run per build thread.
 
 Building
 ========
@@ -59,7 +61,7 @@ Commands:
   help         Print this message or the help of the given subcommand(s)
 
 Options:
-  -q, --quiet    be quiet (no effect yet for cDBG building phase of indexing)
+  -q, --quiet    be quiet: print only warnings and errors
   -h, --help     Print help
   -V, --version  Print version
 ```
@@ -94,10 +96,14 @@ built offline in `--tmp-dir` for large references, see `--mphf-offline auto|alwa
 `partitioned` (~3M-key functions built in parallel; no temporary disk, slightly slower lookups).
 The index format, and the mapping results, are the same.
 
-`--ram-limit-gib` caps the RAM that external minimizer sort may use (default 8 GiB); a smaller value
-spills to disk sooner. Both are useful on HPC systems where `/tmp` is small or the job runs under a
-cgroup memory limit. The index build also detects available memory automatically, walking the cgroup
-chain so a container limit is respected rather than the host's total.
+`--ram-limit-gib` caps the RAM that SSHash's minimizer sort may use; a smaller value spills to disk
+sooner, and `0` means no limit. Both are useful on HPC systems where `/tmp` is small or the job runs
+under a cgroup memory limit. Unset, the cap is derived from the memory this process may use: the
+smallest of physical RAM, `RLIMIT_AS` (`ulimit -v`) and the cgroup memory limit, walking the cgroup
+chain so a container or scheduler limit is respected rather than the host's total. The cap is half
+of that, but at least 8 GiB, or all of it when less than 8 GiB is usable (in whole GiB, rounded
+down); if memory cannot be detected, it is 8 GiB. The build log reports the value used
+(`sshash minimizer-sort RAM budget: ...`).
 
 > **Note**
 > If you are running on an Apple silicon machine, it is highly recommended that you set `-t` to be
@@ -107,9 +113,12 @@ chain so a container limit is respected rather than the host's total.
 
 > **Note**
 > Since piscem 0.24, mapping output is RAD v2 (self-describing: a `RAD_FILE` magic, a format version
-> and tag roles). Reading it requires a tool built on `libradicl` 0.20 or later: an alevin-fry or
-> piscem-infer release newer than alevin-fry 0.18.3 / piscem-infer 0.6.0. Indexes built with
-> piscem 0.23 or earlier must also be rebuilt.
+> and tag roles). Reading it requires a tool built on `libradicl` 0.20 or later: an alevin-fry
+> release newer than 0.18.3 (for `map-sc` and `map-sc-atac` output) or a piscem-infer release newer
+> than 0.7.0 (for `map-bulk` output). alevin-fry 0.18.3 and piscem-infer 0.7.0 and earlier cannot
+> read RAD v2, and fail without a clear message (e.g. alevin-fry panics with `invalid utf-8
+> sequence`, piscem-infer aborts on a huge memory allocation). Indexes built with piscem 0.23 or
+> earlier must also be rebuilt.
 
 map-sc
 ------
@@ -192,9 +201,15 @@ geometry
 
 The geometry parameter `--geometry|-g` can take either a specific geometry name, or a generic
 specifier string. The current valid names are `chromium_v2`, `chromium_v2_5p`, `chromium_v3`,
-`chromium_v3_5p`, and `chromium_v4_3p`. The custom format is as follows: you must specify the
-content of read 1 and read 2 in terms of the barcode, UMI, and mappable read sequence. A
-specification looks like this:
+`chromium_v3_5p`, `chromium_v4_3p`, and `chromium_flex`.
+
+`chromium_flex` takes a 16 bp cell barcode and a 12 bp UMI from read 1, an 8 bp sample barcode from
+bases 26-33 of read 2, and maps the first 25 bases of read 2. That sample-barcode position is a
+fixed default, not the layout of a particular 10x Flex kit, so for real Flex data give the layout
+with the custom format instead (the Flex chemistries built into simpleaf do this).
+
+The custom format is as follows: you must specify the content of read 1 and read 2 in terms of the
+barcode, UMI, and mappable read sequence. A specification looks like this:
 
 ```
 1{b[16]u[12]x:}2{r:}
@@ -216,3 +231,9 @@ obtain the full barcode. A specification that is followed by a specific length (
 pieces, but only one *unbounded* piece (an unbounded piece is a specifier like `r` or `x`, followed
 by `:`). Likewise, since the `:` specifier means to extract this piece until the end of the string,
 the unbounded specifier must be the last specifier in the description of each read (_if it occurs_).
+
+A specification can also contain a sample barcode, `s[N]`, and a fixed anchor sequence, `f[SEQ]`.
+For example, simpleaf describes 10x Flex v1 reads as `1{b[16]u[12]x:}2{r[50]x[18]s[8]x:}`. The
+[`seq_geom_parser` documentation](https://docs.rs/seq_geom_parser) has the full grammar, including
+variable-length pieces placed by an anchor (such as `x[0-3]f[TTGCTAGGACCG]s[10]`), which the rule
+above does not cover.
