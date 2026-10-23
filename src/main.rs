@@ -9,7 +9,7 @@ use anyhow::{Context, Result, bail};
 use cf1_rs::{CfInput, cf_build as cf1_build};
 use clap::{Parser, Subcommand};
 use serde_json::json;
-use tracing::{Level, error, info, warn};
+use tracing::{Level, info, warn};
 
 mod piscem_commands;
 use piscem_commands::*;
@@ -24,6 +24,10 @@ use piscem_rs::cli::map_scrna;
 use piscem_rs::cli::map_scrna::MapScrnaArgs;
 use piscem_rs::cli::poison as rs_poison;
 use piscem_rs::cli::poison::BuildPoisonArgs;
+use piscem_rs::index::paths::{
+    BUILD_ARTIFACT_EXTENSIONS, CTAB_EXT, DICT_EXT, IndexLayout, IndexPaths,
+    POISON_ARTIFACT_EXTENSIONS, POISON_EXT, SIGS_EXT, index_artifact_path, validate_index_prefix,
+};
 
 /// Indexing and mapping to compacted colored de Bruijn graphs
 #[derive(Debug, Parser)]
@@ -123,6 +127,170 @@ fn check_threads(threads: usize, ncpus: usize) -> Result<()> {
     Ok(())
 }
 
+/// `prefix` with `suffix` appended to its file name, byte for byte, as in the
+/// wrapper's own `<prefix>_cfish` and `<prefix>_ver.json`. Unlike
+/// [`index_artifact_path`], this inserts no `.`.
+fn with_suffix(prefix: &Path, suffix: &str) -> PathBuf {
+    let mut name = prefix.as_os_str().to_owned();
+    name.push(suffix);
+    PathBuf::from(name)
+}
+
+/// `<prefix>_cfish`, the prefix cf1-rs is given. It appends [`CF1_SUFFIXES`].
+fn cf_prefix(output: &Path) -> PathBuf {
+    with_suffix(output, "_cfish")
+}
+
+/// What cf1-rs appends to [`cf_prefix`]: the cDBG's json, segment and tiling
+/// files.
+const CF1_SUFFIXES: [&str; 3] = [".json", ".cf_seg", ".cf_seq"];
+
+/// `<prefix>_ver.json`, the versions of the tools that built the index.
+fn ver_file(output: &Path) -> PathBuf {
+    with_suffix(output, "_ver.json")
+}
+
+/// Every file `piscem build` can write for the output prefix `output`, named
+/// exactly as its writer names it: the files of piscem-rs's index and poison
+/// table and the reference signatures, `<prefix>.<ext>`
+/// ([`index_artifact_path`]), and the wrapper's `<prefix>_cfish.*`
+/// ([`cf_prefix`]) and `<prefix>_ver.json` ([`ver_file`]).
+///
+/// `<prefix>.fa.gz` (the `--polya-clip-length` output) is left out on purpose:
+/// it is a natural name for the user's own input FASTA. So are the names
+/// piscem-rs <= 0.11.0 gave the core files of a dotted prefix (`idx/gen.ssi`
+/// for `-o idx/gen.v2`, its last dotted part replaced): they may belong to the
+/// index at the stem (`idx/gen`) or to another old index sharing that stem
+/// (`idx/gen.v1`), and piscem-rs never loads them for an index that has the
+/// current `<prefix>.<ext>` files.
+fn build_artifacts(output: &Path) -> Vec<PathBuf> {
+    let cf_out = cf_prefix(output);
+    let mut files: Vec<PathBuf> = CF1_SUFFIXES
+        .into_iter()
+        .map(|ext| with_suffix(&cf_out, ext))
+        .collect();
+    files.push(ver_file(output));
+    files.extend(
+        BUILD_ARTIFACT_EXTENSIONS
+            .iter()
+            .chain(POISON_ARTIFACT_EXTENSIONS)
+            .chain(&[SIGS_EXT])
+            .map(|ext| index_artifact_path(output, ext)),
+    );
+    files
+}
+
+/// The first of `dir` and its ancestors that exists (a dangling symbolic link
+/// counts) but is not a directory (following links), so that creating `dir`
+/// must fail; `None` if nothing in its path is known to be in the way.
+fn non_directory_in_path(dir: &Path) -> Option<&Path> {
+    dir.ancestors()
+        .filter(|a| !a.as_os_str().is_empty())
+        .find(|a| std::fs::symlink_metadata(a).is_ok())
+        .filter(|a| !a.is_dir())
+}
+
+/// Directories a build has created, removed again, leaf first, if this is
+/// dropped before it is cleared. `remove_dir` removes only an empty
+/// directory, so nothing put in one is lost.
+struct NewDirs(Vec<PathBuf>);
+
+impl NewDirs {
+    /// Create `dir` and each missing parent, as `create_dir_all(dir)` does,
+    /// recording only the directories this call itself created. A directory
+    /// that existed is never recorded, even under a name that does not
+    /// resolve before a parent is created (`missing/../existing`).
+    fn create(dir: &Path) -> io::Result<Self> {
+        let mut created = NewDirs(Vec::new());
+        let missing: Vec<&Path> = dir
+            .ancestors()
+            .take_while(|a| !a.as_os_str().is_empty() && !a.is_dir())
+            .collect();
+        for d in missing.into_iter().rev() {
+            match std::fs::create_dir(d) {
+                Ok(()) => created.0.insert(0, d.to_path_buf()),
+                Err(e) if e.kind() == io::ErrorKind::AlreadyExists && d.is_dir() => {}
+                // Dropping `created` removes what this call has created.
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(created)
+    }
+}
+
+impl Drop for NewDirs {
+    fn drop(&mut self) {
+        for dir in &self.0 {
+            let _ = std::fs::remove_dir(dir);
+        }
+    }
+}
+
+/// The piscem-rs version (major, minor, patch) that `<prefix>_ver.json`
+/// records, if it exists and records one.
+fn recorded_piscem_rs_version(prefix: &Path) -> Option<(u64, u64, u64)> {
+    let ver: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(ver_file(prefix)).ok()?).ok()?;
+    let mut parts = ver
+        .get("piscem-rs")?
+        .as_str()?
+        .split(['.', '-', '+'])
+        .map(|p| p.parse().ok());
+    Some((parts.next()??, parts.next()??, parts.next()??))
+}
+
+/// Indexes beside `output` that piscem-rs <= 0.11.0 built at a dotted prefix
+/// `<output>.<x>`, and whose core files are therefore `<output>.ssi`,
+/// `<output>.ctab`, ...: the files a build at `output` writes.
+///
+/// Candidates are the prefixes `<output>.<x>` with a file that only a
+/// finished build writes at its own prefix: the wrapper's `_ver.json` (last)
+/// or `build-poison`'s `.poison` (after the core files). A failed build leaves
+/// at most `.sigs.json` and `_cfish.*`, so it is not one. A candidate is kept
+/// if [`IndexPaths::resolve`] resolves it to the [`IndexLayout::Legacy`]
+/// layout, i.e. to the core files at `output`, and either its `_ver.json`
+/// records piscem-rs <= 0.11.0 (a later one wrote the current layout, so its
+/// core files cannot be at `output`) or, without a `_ver.json`, it has a
+/// `.poison`. An index that piscem-rs's own `build` made without a poison
+/// table has neither, so it is never named.
+fn legacy_siblings(output: &Path) -> Vec<PathBuf> {
+    let Some(name) = output.file_name() else {
+        return Vec::new();
+    };
+    let dir = output
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let poison_suffix = format!(".{POISON_EXT}");
+    let mut found: Vec<PathBuf> = entries
+        .filter_map(|e| {
+            let file = e.ok()?.file_name();
+            let file = file.to_str()?;
+            let sib = ["_ver.json", &poison_suffix]
+                .into_iter()
+                .find_map(|suffix| file.strip_suffix(suffix))?;
+            // `<output>.<x>` with no further dot: its pre-0.11.1 core files
+            // are at its prefix with the last extension dropped, `output`.
+            (Path::new(sib).with_extension("").as_os_str() == name && sib != name)
+                .then(|| output.with_file_name(sib))
+        })
+        .filter(|sib| {
+            IndexPaths::resolve(sib).layout() == IndexLayout::Legacy
+                && if ver_file(sib).exists() {
+                    recorded_piscem_rs_version(sib).is_some_and(|v| v <= (0, 11, 0))
+                } else {
+                    index_artifact_path(sib, POISON_EXT).is_file()
+                }
+        })
+        .collect();
+    found.sort();
+    found.dedup();
+    found
+}
+
 fn main() -> Result<(), anyhow::Error> {
     let cli_args = Cli::parse();
 
@@ -168,6 +336,21 @@ fn main() -> Result<(), anyhow::Error> {
             ram_limit_gib,
         }) => {
             info!("starting piscem build");
+            // First, before anything (signatures, cf1-rs files, the work
+            // directory) is written: every file of the index is named
+            // `<output>.<ext>` or `<output>_<suffix>`, so `output` must end in
+            // a file name, not name a directory as `-o idx/` does.
+            validate_index_prefix(&output)?;
+            // cf1-rs panics on a prefix that is not UTF-8 (after the signature
+            // pass has written its file), and `map-* -i` takes only UTF-8, so
+            // such a prefix can never become a usable index.
+            if output.to_str().is_none() {
+                bail!(
+                    "invalid index prefix {:?}: it must be valid UTF-8, because cf1-rs and \
+                     `piscem map-* -i` only accept UTF-8 paths",
+                    output
+                );
+            }
             check_threads(threads, ncpus)?;
             if mlen >= klen {
                 bail!(
@@ -199,17 +382,175 @@ fn main() -> Result<(), anyhow::Error> {
                 }
             }
 
+            // Likewise for the reference inputs, so that a mistyped path fails
+            // here, before anything is written (or removed by --overwrite).
+            for (inputs, what) in [
+                (&ref_seqs, "reference file"),
+                (&ref_lists, "reference list file"),
+                (&ref_dirs, "reference directory"),
+            ] {
+                for p in inputs.iter().flatten() {
+                    if !Path::new(p)
+                        .try_exists()
+                        .with_context(|| format!("checking the existence of {} {}", what, p))?
+                    {
+                        bail!("Path for {} {} does not exist", what, p);
+                    }
+                }
+            }
+            // And the files each list names: one per line, trimmed, blank lines
+            // skipped, as cf1-rs reads a list; it would panic on a missing file
+            // without naming it. Each list is read only here, and cf1-rs is
+            // given the paths: a list may be a pipe (`-l <(ls *.fa)`,
+            // `-l /dev/stdin`), which a second read would find empty.
+            let mut listed: Vec<PathBuf> = Vec::new();
+            for list_path in ref_lists.iter().flatten() {
+                let contents = std::fs::read_to_string(list_path)
+                    .with_context(|| format!("reading list file {}", list_path))?;
+                for p in contents.lines().map(str::trim).filter(|l| !l.is_empty()) {
+                    listed.push(PathBuf::from(p));
+                    if !Path::new(p).try_exists().with_context(|| {
+                        format!(
+                            "checking the existence of reference file {} (listed in {})",
+                            p, list_path
+                        )
+                    })? {
+                        bail!(
+                            "Path for reference file {} (listed in {}) does not exist",
+                            p,
+                            list_path
+                        );
+                    }
+                }
+            }
+
+            // Every file a previous build may have left at this prefix. Without
+            // --overwrite, refuse to touch any of them; with it, they are all
+            // removed once cf1-rs has succeeded (below), because piscem-rs
+            // loads the optional ones (EC table, Tiny dictionary, poison
+            // table) whenever they exist, and a stale one would silently
+            // change, or crash, mapping against the new index. The build
+            // writes a regular file at each of these paths, so anything else
+            // there (a directory, a symbolic link, which would be written
+            // through) is refused before anything is written or removed.
+            let artifacts = build_artifacts(&output);
+            let sigs_file = index_artifact_path(&output, SIGS_EXT);
+            let mut existing: Vec<&PathBuf> = Vec::new();
+            for f in &artifacts {
+                match std::fs::symlink_metadata(f) {
+                    Ok(md) if md.is_file() => existing.push(f),
+                    Ok(md) => {
+                        let what = if md.is_dir() {
+                            "is a directory"
+                        } else if md.is_symlink() {
+                            "is a symbolic link"
+                        } else {
+                            "is not a regular file"
+                        };
+                        bail!(
+                            "{} {}, but piscem build writes an index file there; \
+                             remove it or choose another output prefix.",
+                            f.display(),
+                            what
+                        );
+                    }
+                    // Absent. A parent that is not a directory is reported
+                    // below.
+                    Err(e)
+                        if matches!(
+                            e.kind(),
+                            io::ErrorKind::NotFound | io::ErrorKind::NotADirectory
+                        ) => {}
+                    Err(e) => {
+                        return Err(e).with_context(|| format!("failed to check {}", f.display()));
+                    }
+                }
+            }
+            for sib in legacy_siblings(&output) {
+                warn!(
+                    "{}, {}, ... are also the core files of the index {sib}, which \
+                     piscem-rs <= 0.11.0 built in its pre-0.11.1 layout. Building {} \
+                     replaces them, and {sib} would then load the new index's files \
+                     instead of its own: rebuild {sib}, which gives it its own {sib}.* \
+                     files, or remove it.",
+                    index_artifact_path(&output, DICT_EXT).display(),
+                    index_artifact_path(&output, CTAB_EXT).display(),
+                    output.display(),
+                    sib = sib.display(),
+                );
+            }
+            if !overwrite && !existing.is_empty() {
+                warn!(
+                    "The prefix you have chosen for output already holds files from a previous index build:"
+                );
+                for f in &existing {
+                    warn!("  {}", f.display());
+                }
+                warn!(
+                    "Please either delete these files, choose another output prefix, or use the --overwrite flag."
+                );
+                bail!("Cannot write over existing index without the --overwrite flag.");
+            }
+
+            // An output or work directory that cannot be created, because
+            // something other than a directory is at its path or at one of its
+            // parents' (`-w afile`, `-w afile/sub`, a dangling symbolic link),
+            // fails here, before either directory is created.
+            let out_dir = output.parent().filter(|p| !p.as_os_str().is_empty());
+            for (dir, what) in [(out_dir, "output"), (Some(work_dir.as_path()), "work")] {
+                if let Some(dir) = dir
+                    && let Some(blocker) = non_directory_in_path(dir)
+                {
+                    let problem = if blocker.is_symlink() {
+                        "is a symbolic link, but not to a directory"
+                    } else {
+                        "exists but is not a directory"
+                    };
+                    if blocker == dir {
+                        bail!("the {} directory {} {}", what, dir.display(), problem);
+                    }
+                    bail!(
+                        "cannot create the {} directory {}: {} {}",
+                        what,
+                        dir.display(),
+                        blocker.display(),
+                        problem
+                    );
+                }
+            }
+
             // Ensure the parent directory of the output prefix exists.
             if let Some(parent) = output.parent()
                 && !parent.as_os_str().is_empty()
                 && !parent.exists()
             {
-                std::fs::create_dir_all(parent)?;
+                std::fs::create_dir_all(parent).with_context(|| {
+                    format!("failed to create output directory {}", parent.display())
+                })?;
                 info!(
                     "created output directory {} (did not previously exist)",
                     parent.display()
                 );
             }
+
+            // Ensure work directory exists. A build that fails before cf1-rs
+            // is given it (on an `-s` file that is not FASTA, say) removes the
+            // directories created here again, so it leaves no new, empty work
+            // directory behind.
+            let mut new_work_dirs = if work_dir.is_dir() {
+                info!(
+                    "will use {} as the work directory for temporary files.",
+                    work_dir.display()
+                );
+                NewDirs(Vec::new())
+            } else {
+                NewDirs::create(&work_dir).with_context(|| {
+                    format!(
+                        "failed to create working directory {} for index construction",
+                        work_dir.display()
+                    )
+                })?
+            };
 
             // Build CfInput from CLI args, using native variants where possible.
             // With --polya-clip-length, cf1-rs reads the clipped reference
@@ -217,8 +558,9 @@ fn main() -> Result<(), anyhow::Error> {
             let mut clipped_ref = None;
             let cf_input = if let Some(ref seqs) = ref_seqs {
                 if !seqs.is_empty() {
-                    let out_stem =
-                        PathBuf::from(output.as_path().to_string_lossy().into_owned() + ".sigs");
+                    // prepare_fasta appends `.json` to this stem, so it writes
+                    // `<output>.sigs.json`, the file piscem-rs reads.
+                    let out_stem = index_artifact_path(&output, SIGS_EXT).with_extension("");
                     if polya_clip_length.is_some() {
                         // prepare_fasta truncates `<out>.fa.gz` before it reads
                         // the inputs (and it is removed after indexing), so it
@@ -257,30 +599,20 @@ fn main() -> Result<(), anyhow::Error> {
                     info!("Computing and recording reference signatures...");
                     // Without clipping these are the input files; with it, the
                     // one clipped file (the signatures are of the unclipped input).
-                    let files = prepare_fasta::parse_records(configs)?;
+                    let files = prepare_fasta::parse_records(configs).with_context(|| {
+                        format!(
+                            "failed to record reference signatures in {}",
+                            sigs_file.display()
+                        )
+                    })?;
                     info!("done.");
                     CfInput::Files(files)
                 } else {
                     bail!("--ref-seqs provided but empty");
                 }
-            } else if let Some(ref lists) = ref_lists {
-                if lists.len() == 1 {
-                    CfInput::ListFile(PathBuf::from(&lists[0]))
-                } else {
-                    // Multiple list files — resolve all to individual paths.
-                    let mut files = Vec::new();
-                    for list_path in lists {
-                        let contents = std::fs::read_to_string(list_path)
-                            .with_context(|| format!("reading list file {}", list_path))?;
-                        for line in contents.lines() {
-                            let line = line.trim();
-                            if !line.is_empty() {
-                                files.push(PathBuf::from(line));
-                            }
-                        }
-                    }
-                    CfInput::Files(files)
-                }
+            } else if ref_lists.is_some() {
+                // The paths every list names, in order, read above.
+                CfInput::Files(listed)
             } else if let Some(ref dirs) = ref_dirs {
                 if dirs.len() == 1 {
                     CfInput::Directory(PathBuf::from(&dirs[0]))
@@ -291,7 +623,9 @@ fn main() -> Result<(), anyhow::Error> {
                         for entry in std::fs::read_dir(dir_path)
                             .with_context(|| format!("reading directory {}", dir_path))?
                         {
-                            let path = entry?.path();
+                            let path = entry
+                                .with_context(|| format!("reading directory {}", dir_path))?
+                                .path();
                             if path.is_file() {
                                 if is_reference_file(&path)? {
                                     files.push(path);
@@ -310,69 +644,20 @@ fn main() -> Result<(), anyhow::Error> {
                 bail!("Input (via --ref-seqs, --ref-lists, or --ref-dirs) must be provided.");
             };
 
-            let cf_out = PathBuf::from(output.as_path().to_string_lossy().into_owned() + "_cfish");
-            let cf_out_str = cf_out.as_path().to_string_lossy();
-            let seg_file = PathBuf::from(format!("{}.cf_seg", cf_out_str));
-            let seq_file = PathBuf::from(format!("{}.cf_seq", cf_out_str));
-            let struct_file = PathBuf::from(format!("{}.json", cf_out_str));
-
-            if overwrite {
-                for f in [&struct_file, &seg_file, &seq_file] {
-                    if f.exists() {
-                        std::fs::remove_file(f)?;
-                    }
-                }
-            }
-
-            if struct_file.exists() && (!seq_file.exists() || !seg_file.exists()) {
-                warn!(
-                    "The prefix you have chosen for output already corresponds to an existing cDBG structure file {:?}.",
-                    struct_file.display()
-                );
-                warn!(
-                    "However, the corresponding seq and seg files do not exist. Please either delete this structure file, choose another output prefix, or use the --overwrite flag."
-                );
-                bail!("Cannot write over existing index without the --overwrite flag.");
-            }
-
-            // Ensure work directory exists.
-            match work_dir.try_exists() {
-                Ok(true) => {
-                    info!(
-                        "will use {} as the work directory for temporary files.",
-                        work_dir.display()
-                    );
-                }
-                Ok(false) => match std::fs::create_dir_all(&work_dir) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        error!(
-                            "when attempting to create working directory {}, encountered error {:#?}",
-                            &work_dir.display(),
-                            e
-                        );
-                        bail!(
-                            "Failed to create working directory {} for index construction : {:#?}",
-                            work_dir.display(),
-                            e
-                        );
-                    }
-                },
-                Err(e) => {
-                    error!("when checking existence of working directory {:#?}", e);
-                    bail!(
-                        "Failed to create working directory for index construction : {:#?}",
-                        e
-                    );
-                }
-            }
+            // cf1-rs appends its extensions to the prefix it is given.
+            let cf_out = cf_prefix(&output);
 
             // Ensure the output parent directory exists.
             if let Some(parent_path) = cf_out.parent()
                 && !parent_path.as_os_str().is_empty()
                 && !parent_path.exists()
             {
-                std::fs::create_dir_all(parent_path)?;
+                std::fs::create_dir_all(parent_path).with_context(|| {
+                    format!(
+                        "failed to create output directory {}",
+                        parent_path.display()
+                    )
+                })?;
                 info!(
                     "directory {} did not already exist; creating it.",
                     parent_path.display()
@@ -380,6 +665,8 @@ fn main() -> Result<(), anyhow::Error> {
             }
 
             info!("starting cDBG construction with cf1-rs");
+            // cf1-rs has the work directory from here on; it is kept.
+            new_work_dirs.0.clear();
             let cf_result = cf1_build()
                 .input(cf_input)
                 .output_prefix(cf_out.clone())
@@ -387,6 +674,34 @@ fn main() -> Result<(), anyhow::Error> {
                 .threads(threads)
                 .work_dir(work_dir.clone())
                 .call()?;
+
+            // Only now, with every reference input read and the cDBG built,
+            // clear the previous build, so a build that fails on its reference
+            // inputs (a list naming a file that is not FASTA, a directory
+            // holding none) keeps the previous index. Kept: the files cf1-rs
+            // has just rewritten and, for -s, the signatures the pass above
+            // has just rewritten. The decoys are read only by build-poison,
+            // after piscem-rs has built the new index, so a bad decoy file
+            // leaves that index without a poison table.
+            if overwrite {
+                let rewritten = [
+                    &cf_result.json_file,
+                    &cf_result.seg_file,
+                    &cf_result.seq_file,
+                ];
+                for f in existing {
+                    if rewritten.contains(&f) || (ref_seqs.is_some() && *f == sigs_file) {
+                        continue;
+                    }
+                    info!(
+                        "--overwrite: removing {} from the previous build",
+                        f.display()
+                    );
+                    std::fs::remove_file(f).with_context(|| {
+                        format!("failed to remove {} from the previous build", f.display())
+                    })?;
+                }
+            }
 
             info!(
                 "cDBG construction complete: {} unitigs, {} vertices",
@@ -455,12 +770,11 @@ fn main() -> Result<(), anyhow::Error> {
                 "piscem": piscem_ver
             });
 
-            let mut fname = output.as_path().to_string_lossy().into_owned();
-            fname.push_str("_ver.json");
-
-            let fname = PathBuf::from(fname);
-            let ver_file = std::fs::File::create(fname)?;
-            serde_json::to_writer_pretty(ver_file, &version_json)?;
+            let fname = ver_file(&output);
+            let ver_out = std::fs::File::create(&fname)
+                .with_context(|| format!("failed to create {}", fname.display()))?;
+            serde_json::to_writer_pretty(ver_out, &version_json)
+                .with_context(|| format!("failed to write {}", fname.display()))?;
 
             info!("piscem build finished.");
         }
@@ -595,4 +909,19 @@ fn main() -> Result<(), anyhow::Error> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Cli;
+    use clap::CommandFactory;
+
+    /// Catches clap misconfigurations (conflicting short flags, bad defaults,
+    /// ...) that would otherwise only surface when the affected subcommand is
+    /// parsed. clap only runs these checks with debug assertions enabled, so
+    /// this guards `cargo test`, not `cargo test --release`.
+    #[test]
+    fn cli_is_consistent() {
+        Cli::command().debug_assert();
+    }
 }
