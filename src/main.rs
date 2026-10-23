@@ -503,3 +503,18 @@ fn main() -> Result<(), anyhow::Error> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Cli;
+    use clap::CommandFactory;
+
+    /// Catches clap misconfigurations (conflicting short flags, bad defaults,
+    /// ...) that would otherwise only surface when the affected subcommand is
+    /// parsed. clap only runs these checks with debug assertions enabled, so
+    /// this guards `cargo test`, not `cargo test --release`.
+    #[test]
+    fn cli_is_consistent() {
+        Cli::command().debug_assert();
+    }
+}

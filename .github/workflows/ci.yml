@@ -1,0 +1,40 @@
+# Build, test and lint every PR and every push to main. This is independent
+# of the cargo-dist release workflow (release.yml), which on PRs only runs
+# `dist plan` and never compiles the crate.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A new push to a PR cancels that PR's running checks. Each push to main
+# gets its own group, so runs on main are never queued or cancelled.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      # First, so a formatting-only failure is reported before any compiling.
+      - run: cargo fmt --check
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --locked
+      # Dev profile on purpose: clap's `debug_assert()` CLI check only runs
+      # with debug assertions on. tests/cli_smoke.rs builds a tiny index, maps
+      # bulk and single-cell reads, and checks the RAD v2 header and
+      # map_info.json counts.
+      - run: cargo test --locked
+      - run: cargo clippy --all-targets --locked -- -D warnings
