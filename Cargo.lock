@@ -1694,9 +1694,9 @@ dependencies = [
 
 [[package]]
 name = "piscem-rs"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f4b4a1a65bc50ecd8cf1e0c23549e2eef13735cf801a9708fec37b5fbd603c2"
+checksum = "9e487e77d0d7518e1130d939e469b7f0c83339ec807c3de45a92765d88185778"
 dependencies = [
  "ahash",
  "anyhow",
