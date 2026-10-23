@@ -25,6 +25,8 @@ piscem-rs = { version = "0.11.1", default-features = false, features = [
   "rapidgzip",
 ] }
 cf1-rs = "0.5.1"
+# The reader cf1-rs opens its inputs with; keep the version in step with it.
+needletail = "0.7"
 anyhow = "1.0"
 clap = { version = "4.6", features = ["cargo", "derive", "env", "wrap_help"] }
 tracing = "0.1"

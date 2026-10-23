@@ -1684,6 +1684,7 @@ dependencies = [
  "cf1-rs",
  "clap",
  "mimalloc",
+ "needletail 0.7.3",
  "piscem-rs",
  "prepare_fasta",
  "serde_json",
