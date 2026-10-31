@@ -9,6 +9,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
+name = "adler32furious"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67753fa0e5e56fa79255f125be5bb94b2f3570537bd1c66e9b146858f53cd298"
+
+[[package]]
 name = "ahash"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -172,12 +178,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "binout"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff5fa7be63dbf62cca511b0e64e4b869ebc68f2b99d65fb1aa127771c5b7cd0d"
-
-[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -188,15 +188,6 @@ name = "bitflags"
 version = "2.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b588b76d00fde79687d7646a9b5bdf3cc0f655e0bbd080335a95d7e96f3587da"
-
-[[package]]
-name = "bitm"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31468ea4a856000d83cb61960dfdc2980ecd96b15b61321c8c76cc96aea6e688"
-dependencies = [
- "dyn_size_of",
-]
 
 [[package]]
 name = "block-buffer"
@@ -337,24 +328,27 @@ dependencies = [
 
 [[package]]
 name = "cf1-rs"
-version = "0.5.1"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ebda095ccaa404da8b08e93d95cf66da9ac102ad22ae1350061af8425e506df"
+checksum = "0880342df4e2e6aad18f8a03fca1532f7e699507f74dc8983f8aee43ba12eafa"
 dependencies = [
  "ahash",
  "anyhow",
  "bon",
  "clap",
  "crossbeam-channel",
+ "dsi-progress-logger",
  "itoa",
+ "lender",
  "libc",
  "needletail 0.7.3",
  "nohash-hasher",
- "ph",
+ "rapidhash",
  "rayon",
  "serde",
  "serde_json",
  "simd-minimizers",
+ "sux",
  "tracing",
  "tracing-subscriber",
  "voracious_radix_sort",
@@ -381,7 +375,7 @@ checksum = "65c35e4b699c7e15ccbe7ee35c005e4fc0a278d22238a2857e6ce2dadeda1b06"
 dependencies = [
  "cfg-if",
  "cpufeatures 0.3.1",
- "rand_core 0.10.1",
+ "rand_core",
 ]
 
 [[package]]
@@ -786,21 +780,15 @@ dependencies = [
 
 [[package]]
 name = "dsi-progress-logger"
-version = "0.8.9"
+version = "0.8.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc2f98e7418e41b0138729f1d1ca4f0ecc105e98639ca6ef736acf081e47db45"
+checksum = "4c3394f42d94af60fb7c43d94ca60e659b3da88dedb3af0489e52a24d381573f"
 dependencies = [
  "log",
  "num-format",
  "pluralizer",
  "sysinfo",
 ]
-
-[[package]]
-name = "dyn_size_of"
-version = "0.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a742b95783b1f45b900129082cbc47717b6a77ee8d17eea70a8ea62462f5de3"
 
 [[package]]
 name = "either"
@@ -1008,7 +996,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "r-efi 6.0.0",
- "rand_core 0.10.1",
+ "rand_core",
 ]
 
 [[package]]
@@ -1656,21 +1644,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1cbc2d27ab7424ba124b691f0abb77ff27474c3eaa7478baf50600fa67c3677c"
 
 [[package]]
-name = "ph"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a447f203c7254ebb06aa4f111480e821debb361e80fb4d760554a8460f236550"
-dependencies = [
- "arrayvec",
- "binout",
- "bitm",
- "dyn_size_of",
- "rayon",
- "seedable_hash",
- "voracious_radix_sort",
-]
-
-[[package]]
 name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1695,9 +1668,9 @@ dependencies = [
 
 [[package]]
 name = "piscem-rs"
-version = "0.11.1"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e487e77d0d7518e1130d939e469b7f0c83339ec807c3de45a92765d88185778"
+checksum = "1b5932be0a89215403a0eeaa325e787a4d651c70a4d6032afc12af93377992d5"
 dependencies = [
  "ahash",
  "anyhow",
@@ -1713,9 +1686,11 @@ dependencies = [
  "niffler",
  "paraseq-temp",
  "rapidgzip-core",
+ "rayon",
  "seq_geom_parser",
  "serde",
  "serde_json",
+ "sirocco",
  "smallvec",
  "sshash-lib",
  "sux",
@@ -1881,14 +1856,8 @@ checksum = "c7f5fa3a058cd35567ef9bfa5e75732bee0f9e4c55fa90477bef2dfcdbc4be80"
 dependencies = [
  "chacha20",
  "getrandom 0.4.3",
- "rand_core 0.10.1",
+ "rand_core",
 ]
-
-[[package]]
-name = "rand_core"
-version = "0.6.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 
 [[package]]
 name = "rand_core"
@@ -2061,15 +2030,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "seedable_hash"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba2a159211665e29bbf5a2fbb42da50dd6eadff23eef7a6a7ae4a9b0a7cd0152"
-dependencies = [
- "wyhash",
-]
-
-[[package]]
 name = "seq-hash"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2202,6 +2162,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "sirocco"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10d7c47e1d59501b383fc09e6d00a26d72ceca841cf5c25458762f7006acb39f"
+dependencies = [
+ "adler32furious",
+ "crc32fast",
+]
+
+[[package]]
 name = "slab"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2215,9 +2185,9 @@ checksum = "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b"
 
 [[package]]
 name = "sshash-lib"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9547b4612d43612c58c67185ee6596d4d8a9e9cb404d5cfbce7b16e8a70d97b3"
+checksum = "71ea4a34780f39a2a0ac04eb5d2f5c42a6f2ab69f6430f3c2d846df4fc744c36"
 dependencies = [
  "anyhow",
  "dsi-progress-logger",
@@ -2263,9 +2233,9 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
 name = "sux"
-version = "0.15.2"
+version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b32377c1f8d599f2b6ef8bc7f44176d19b3b33c2909dd3a63152e25afa430bc"
+checksum = "1fd3e634d4362b016487aabb5f8451354ca61d3fad043c0b13b1036916c8b144"
 dependencies = [
  "ambassador",
  "anyhow",
@@ -2276,7 +2246,6 @@ dependencies = [
  "dsi-progress-logger",
  "epserde",
  "fallible-iterator",
- "flate2",
  "impl-tools",
  "lender",
  "log",
@@ -2292,7 +2261,6 @@ dependencies = [
  "value-traits",
  "xxhash-rust",
  "zerocopy",
- "zstd",
 ]
 
 [[package]]
@@ -3096,15 +3064,6 @@ name = "wit-bindgen"
 version = "0.57.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
-
-[[package]]
-name = "wyhash"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "baf6e163c25e3fac820b4b453185ea2dea3b6a3e0a721d4d23d75bd33734c295"
-dependencies = [
- "rand_core 0.6.4",
-]
 
 [[package]]
 name = "xxhash-rust"
