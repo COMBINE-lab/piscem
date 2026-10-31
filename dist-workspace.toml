@@ -32,9 +32,25 @@ build = ["bash", "-c", """
   """]
 
 [dist.github-custom-runners]
-aarch64-apple-darwin = "macos-14"
 x86_64-apple-darwin = "macos-15-intel"
-x86_64-unknown-linux-gnu = "ubuntu-22.04"
+
+# macos-14 retires on 2026-11-02 (actions/runner-images#13518); build the
+# Apple Silicon binary on macos-15. Its deployment target is unchanged
+# (rustc's default for aarch64-apple-darwin, macOS 11).
+[dist.github-custom-runners.aarch64-apple-darwin]
+runner = "macos-15"
+
+# Build the Linux binaries inside manylinux_2_28 containers (glibc 2.28), so
+# they run on RHEL/Rocky 8, Debian 10, Ubuntu 18.10 and newer; built on the
+# runners themselves they would need the runner's glibc (2.35+). glibc is
+# linked dynamically, so a newer host's libc is used where present.
+[dist.github-custom-runners.x86_64-unknown-linux-gnu]
+runner = "ubuntu-22.04"
+container = { image = "quay.io/pypa/manylinux_2_28_x86_64", host = "x86_64-unknown-linux-musl" }
+
+[dist.github-custom-runners.aarch64-unknown-linux-gnu]
+runner = "ubuntu-24.04-arm"
+container = { image = "quay.io/pypa/manylinux_2_28_aarch64", host = "aarch64-unknown-linux-musl" }
 
 [dist.dependencies.homebrew]
 coreutils = { stage = ["build"] }
